@@ -1,0 +1,522 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+type Skill = {
+  id: string;
+  title: string;
+  teacher: string;
+  category: string[];
+  desc: string;
+  image: string;
+  imageMode?: string;
+  rating: string;
+  users: string;
+  discount: string;
+  price: string;
+  oldPrice: string;
+  tag: string;
+  fields: string[];
+};
+
+const skills: Skill[] = [
+  {
+    id: "reunion-tarot",
+    title: "复合塔罗：TA会主动回来吗？",
+    teacher: "红线AI塔罗师",
+    category: ["love", "tarot"],
+    desc: "从三张牌看对方真实状态、复联窗口和你该不该主动。",
+    image: "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_06_Lovers.jpg",
+    imageMode: "contain-image",
+    rating: "4.9",
+    users: "10万+",
+    discount: "18%",
+    price: "19.9",
+    oldPrice: "24.0",
+    tag: "情感热门",
+    fields: ["你的出生日期", "对方信息", "分开多久", "最近一次互动", "你最想确认的事"],
+  },
+  {
+    id: "daily-oracle",
+    title: "今日免费一问：现在该注意什么？",
+    teacher: "星命局日签",
+    category: ["daily", "tarot"],
+    desc: "一张牌 + 今日星象，给你一个轻量但明确的行动提醒。",
+    image: "https://images.unsplash.com/photo-1604079628040-94301bb21b91?auto=format&fit=crop&w=500&q=82",
+    rating: "4.8",
+    users: "50万+",
+    discount: "FREE",
+    price: "0",
+    oldPrice: "6.9",
+    tag: "免费",
+    fields: ["今天最重要的事", "当前情绪", "想问的具体问题"],
+  },
+  {
+    id: "bazi-wealth",
+    title: "八字财运：未来30天进财窗口",
+    teacher: "玄策命理实验室",
+    category: ["wealth", "bazi"],
+    desc: "结合五行、十神和现实现金流，判断近期收入机会与风险。",
+    image: "https://images.unsplash.com/photo-1606189934846-a527add8a77b?auto=format&fit=crop&w=500&q=82",
+    rating: "4.7",
+    users: "8万+",
+    discount: "12%",
+    price: "22.9",
+    oldPrice: "26.0",
+    tag: "财运",
+    fields: ["出生年月日时", "出生地", "职业阶段", "当前收入压力", "正在考虑的行动"],
+  },
+  {
+    id: "ziwei-love-map",
+    title: "紫微恋爱命盘：正缘出现在哪里？",
+    teacher: "北斗AI命盘师",
+    category: ["love", "compatibility"],
+    desc: "用命宫、夫妻宫与迁移宫，推演关系机会、地点和相处模式。",
+    image: "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=500&q=82",
+    rating: "4.9",
+    users: "6万+",
+    discount: "15%",
+    price: "29.9",
+    oldPrice: "35.0",
+    tag: "深度报告",
+    fields: ["出生年月日时", "出生地", "当前感情状态", "理想对象", "过去半年关系变化"],
+  },
+  {
+    id: "career-choice",
+    title: "事业选择：跳槽还是留下？",
+    teacher: "天机AI决策局",
+    category: ["career", "bazi"],
+    desc: "把命局节奏、卦象和现实约束合并成一张选择判断表。",
+    image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=500&q=82",
+    rating: "4.8",
+    users: "5万+",
+    discount: "9%",
+    price: "18.8",
+    oldPrice: "20.6",
+    tag: "事业",
+    fields: ["出生信息", "当前岗位", "备选机会", "最担心的风险", "决定期限"],
+  },
+  {
+    id: "western-chart",
+    title: "西占本命盘：你的人格底层设定",
+    teacher: "星盘算法局",
+    category: ["daily", "compatibility"],
+    desc: "太阳、月亮、上升与宫位合参，生成长期个人档案。",
+    image: "https://images.unsplash.com/photo-1465101162946-4377e57745c3?auto=format&fit=crop&w=500&q=82",
+    rating: "4.8",
+    users: "12万+",
+    discount: "20%",
+    price: "16.9",
+    oldPrice: "21.0",
+    tag: "建档必看",
+    fields: ["出生年月日", "精确出生时间", "出生城市", "想重点了解的领域"],
+  },
+  {
+    id: "marriage-match",
+    title: "婚恋合盘：这段关系适合走长期吗？",
+    teacher: "合参关系所",
+    category: ["love", "compatibility"],
+    desc: "对比双方资料，输出吸引点、冲突点、长期稳定度。",
+    image: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=500&q=82",
+    rating: "4.6",
+    users: "3万+",
+    discount: "10%",
+    price: "24.9",
+    oldPrice: "27.6",
+    tag: "合盘",
+    fields: ["双方出生信息", "关系阶段", "相处时长", "最大矛盾", "是否考虑婚姻"],
+  },
+  {
+    id: "monthly-fortune",
+    title: "月运报告：本月三件关键事",
+    teacher: "星历AI编辑部",
+    category: ["daily", "career", "wealth"],
+    desc: "把月相、行运、五行流月和黄历节奏合成月度提醒。",
+    image: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?auto=format&fit=crop&w=500&q=82",
+    rating: "4.9",
+    users: "20万+",
+    discount: "25%",
+    price: "12.9",
+    oldPrice: "17.2",
+    tag: "月运",
+    fields: ["出生信息", "本月目标", "感情状态", "工作状态", "财务压力"],
+  },
+];
+
+const categories = [
+  ["all", "全部"],
+  ["love", "情感"],
+  ["tarot", "塔罗"],
+  ["bazi", "八字"],
+  ["wealth", "财运"],
+  ["career", "事业"],
+  ["daily", "每日"],
+  ["compatibility", "合盘"],
+];
+
+const categoryLabelMap = new Map<string, string>(categories.map(([value, label]) => [value, label]));
+
+const navItems = ["技能", "聊天", "免费", "评价"] as const;
+type NavLabel = (typeof navItems)[number];
+
+const chatQuestionStatsKey = "xingmingju-chat-question-stats";
+
+const chatPromptCategories = [
+  { id: "relationship-stage", label: "关系阶段", prompt: "我们现在处在暧昧、断联或分手后的哪个阶段？我想判断下一步该主动还是观察。", keywords: ["暧昧", "断联", "分手", "复合", "阶段", "主动", "观察"] },
+  { id: "timeline", label: "时间线", prompt: "我们最近一次互动是什么时候？中间发生了哪些关键节点？我想梳理这段关系的时间线。", keywords: ["多久", "什么时候", "最近", "时间", "昨天", "上周", "节点", "联系"] },
+  { id: "person-info", label: "对方信息", prompt: "我想补充对方的性格、生日或近期表现，请帮我判断 TA 现在的真实状态。", keywords: ["对方", "TA", "他", "她", "生日", "性格", "表现", "状态"] },
+  { id: "core-question", label: "核心问题", prompt: "我最想确认的是：这段关系还有机会吗？我现在最应该做什么？", keywords: ["机会", "怎么办", "该不该", "应该", "核心", "结果", "还会"] },
+  { id: "wealth", label: "财运收入", prompt: "我想看看近期财运、收入或副业机会，最需要注意哪些风险和窗口？", keywords: ["财", "钱", "收入", "副业", "现金", "投资", "涨薪"] },
+  { id: "career", label: "事业选择", prompt: "我正在纠结工作、跳槽或 offer 选择，想判断哪个方向更适合。", keywords: ["工作", "事业", "跳槽", "offer", "老板", "岗位", "职业"] },
+  { id: "match", label: "合盘长期", prompt: "我想看这段关系是否适合长期发展，双方吸引点和冲突点在哪里？", keywords: ["合盘", "婚姻", "结婚", "长期", "伴侣", "稳定"] },
+  { id: "daily", label: "今日提醒", prompt: "我想先做一次今日提醒，看看现在最该注意什么。", keywords: ["今天", "现在", "日签", "提醒", "免费", "注意"] },
+] as const;
+
+type ChatPromptCategory = (typeof chatPromptCategories)[number];
+
+function getLocalDateKey() {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function createEmptyQuestionStats() {
+  return Object.fromEntries(chatPromptCategories.map((category) => [category.id, 0])) as Record<string, number>;
+}
+
+function findQuestionCategory(question: string) {
+  const text = question.trim().toLowerCase();
+  const scoredCategories = chatPromptCategories.map((category) => ({
+    category,
+    score: category.keywords.filter((keyword) => text.includes(keyword.toLowerCase())).length,
+  }));
+  const bestMatch = scoredCategories.sort((left, right) => right.score - left.score)[0];
+  return bestMatch.score > 0 ? bestMatch.category : chatPromptCategories[3];
+}
+
+function getVisibleQuestionChips(question: string, stats: Record<string, number>) {
+  const matchedCategory = question.trim() ? findQuestionCategory(question) : null;
+  return [...chatPromptCategories]
+    .sort((left, right) => {
+      const leftMatched = matchedCategory?.id === left.id ? 1 : 0;
+      const rightMatched = matchedCategory?.id === right.id ? 1 : 0;
+      if (leftMatched !== rightMatched) return rightMatched - leftMatched;
+      const countDiff = (stats[right.id] || 0) - (stats[left.id] || 0);
+      if (countDiff !== 0) return countDiff;
+      return chatPromptCategories.findIndex((category) => category.id === left.id) - chatPromptCategories.findIndex((category) => category.id === right.id);
+    })
+    .slice(0, 4);
+}
+
+const navTargets: Record<NavLabel, string> = {
+  技能: "featured",
+  聊天: "chat-section",
+  免费: "free-section",
+  评价: "review-section",
+};
+
+function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: (skill: Skill) => void }) {
+  const discount = skill.discount === "FREE" ? "免费" : `${skill.discount} OFF`;
+
+  return (
+    <button className="skill-card" type="button" onClick={() => onOpen(skill)}>
+      <img className={`skill-image ${skill.imageMode || ""}`} src={skill.image} alt={skill.title} />
+      <span className="skill-meta">
+        <span className="skill-chip">{skill.tag}</span>
+        <h3>{skill.title}</h3>
+        <span className="teacher">by {skill.teacher}</span>
+        <span className="rating"><strong>{skill.rating}</strong> · 用户 {skill.users}</span>
+        <span className="desc">{skill.desc}</span>
+        <span className="price-row"><strong>¥{skill.price}</strong><del>¥{skill.oldPrice}</del><span className="discount">{discount}</span></span>
+      </span>
+    </button>
+  );
+}
+
+function buildMockResult(form: HTMLFormElement, skill: Skill) {
+  const data = new FormData(form);
+  const nickname = data.get("nickname") || "你";
+  const hasTime = Boolean(data.get("birthTime"));
+  const confidence = hasTime ? 88 : 78;
+
+  return {
+    title: `${nickname}的《${skill.title}》`,
+    completeness: hasTime ? "高" : "中",
+    confidence,
+    items: [
+      "塔罗层：当前牌面显示问题有推进空间，但需要观察对方或现实环境的连续行动。",
+      hasTime ? "命盘层：出生时间完整，可纳入宫位判断。" : "命盘层：缺少出生时间，紫微与宫位判断降权。",
+      "现实层：你提供的背景会作为主判断依据，AI不会只凭玄学符号下结论。",
+      "行动建议：未来7天适合小步验证，不适合一次性投入过多情绪或资金。",
+    ],
+  };
+}
+
+export default function Home() {
+  const [activeNav, setActiveNav] = useState<NavLabel>("技能");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [query, setQuery] = useState("");
+  const [chatQuestion, setChatQuestion] = useState("");
+  const [dailyQuestionStats, setDailyQuestionStats] = useState<Record<string, number>>(createEmptyQuestionStats);
+  const [chatSuggestion, setChatSuggestion] = useState<Skill | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [result, setResult] = useState<ReturnType<typeof buildMockResult> | null>(null);
+
+  const filteredSkills = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return skills.filter((skill) => {
+      const categoryMatch = activeCategory === "all" || skill.category.includes(activeCategory);
+      const categoryLabels = skill.category.map((category) => categoryLabelMap.get(category) || category).join(" ");
+      const text = [skill.title, skill.teacher, skill.desc, skill.tag, categoryLabels].join(" ").toLowerCase();
+      return categoryMatch && (!normalizedQuery || text.includes(normalizedQuery));
+    });
+  }, [activeCategory, query]);
+
+  const hasSkillFilters = activeCategory !== "all" || Boolean(query.trim());
+  const newSkills = useMemo(() => filteredSkills.filter((skill) => skill.id !== "daily-oracle").slice().reverse().slice(0, 4), [filteredSkills]);
+
+  const visibleQuestionChips = useMemo(() => getVisibleQuestionChips(chatQuestion, dailyQuestionStats), [chatQuestion, dailyQuestionStats]);
+  const displayedChatSuggestion = chatQuestion.trim() ? recommendSkill(chatQuestion) : chatSuggestion;
+
+  useEffect(() => {
+    fetch("/api/questions/trending")
+      .then((response) => response.json())
+      .then((data: { counts?: Record<string, number> }) => {
+        if (data.counts) setDailyQuestionStats({ ...createEmptyQuestionStats(), ...data.counts });
+      })
+      .catch(() => setDailyQuestionStats(createEmptyQuestionStats()));
+  }, []);
+
+  function resetFilters() {
+    setQuery("");
+    setActiveCategory("all");
+  }
+
+  function scrollToSection(id: string) {
+    window.setTimeout(() => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      const headerOffset = 92;
+      const top = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+      window.scrollTo({ top, behavior: "auto" });
+    }, 0);
+  }
+
+  function handleNavClick(label: NavLabel) {
+    setActiveNav(label);
+
+    if (label === "技能") {
+      resetFilters();
+    }
+
+    scrollToSection(navTargets[label]);
+  }
+
+  function recommendSkill(question: string) {
+    const text = question.trim().toLowerCase();
+    if (/财|钱|收入|副业|现金|投资/.test(text)) return skills.find((skill) => skill.id === "bazi-wealth") || skills[0];
+    if (/工作|事业|跳槽|offer|老板|岗位|职业/.test(text)) return skills.find((skill) => skill.id === "career-choice") || skills[0];
+    if (/合盘|婚姻|结婚|长期|伴侣/.test(text)) return skills.find((skill) => skill.id === "marriage-match") || skills[0];
+    if (/免费|今天|现在|日签|提醒/.test(text)) return skills.find((skill) => skill.id === "daily-oracle") || skills[0];
+    if (/正缘|对象|桃花/.test(text)) return skills.find((skill) => skill.id === "ziwei-love-map") || skills[0];
+    return skills.find((skill) => skill.id === "reunion-tarot") || skills[0];
+  }
+
+  async function submitChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const question = chatQuestion || "我想先做一次免费体验";
+    await recordQuestionCategory(question);
+    setChatSuggestion(recommendSkill(question));
+  }
+
+  async function recordQuestionCategory(question: string) {
+    const matchedCategory = findQuestionCategory(question);
+    const fallbackStats = { ...createEmptyQuestionStats(), ...dailyQuestionStats, [matchedCategory.id]: (dailyQuestionStats[matchedCategory.id] || 0) + 1 };
+
+    try {
+      const response = await fetch("/api/chat/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, record: true }),
+      });
+      const data = (await response.json()) as { stats?: Record<string, number>; skill?: Skill };
+      setDailyQuestionStats({ ...createEmptyQuestionStats(), ...(data.stats || fallbackStats) });
+      if (data.skill) setChatSuggestion(data.skill);
+    } catch {
+      setDailyQuestionStats(fallbackStats);
+    }
+  }
+
+  function openSkill(skill: Skill) {
+    setSelectedSkill(skill);
+    setResult(null);
+  }
+
+  async function submitOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedSkill) return;
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
+
+    try {
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skillId: selectedSkill.id, payload }),
+      });
+      const data = (await response.json()) as { result?: ReturnType<typeof buildMockResult> };
+      setResult(data.result || buildMockResult(form, selectedSkill));
+    } catch {
+      setResult(buildMockResult(form, selectedSkill));
+    }
+  }
+
+  return (
+    <>
+      <header className="app-header">
+        <div className="header-inner">
+          <a className="brand" href="#top" aria-label="星命局首页"><span className="brand-mark">局</span><span>星命局</span></a>
+          <label className="search-box"><span className="search-label">搜索<span className="search-divider" aria-hidden="true">|</span></span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="复合、财运、塔罗、八字" /></label>
+          <nav className="main-tabs" aria-label="主导航">
+            {navItems.map((label) => <button className={activeNav === label ? "active" : ""} key={label} type="button" onClick={() => handleNavClick(label)} aria-current={activeNav === label ? "page" : undefined}>{label}</button>)}
+          </nav>
+        </div>
+      </header>
+
+      <main id="top">
+        <section className="hero-store">
+          <div className="hero-content">
+            <p className="eyebrow">AI metaphysics marketplace</p>
+            <h1>像点外卖一样，选择你今天需要的运势技能。</h1>
+            <p>星命局把塔罗、八字、西占、紫微、周易包装成一个个可购买的 AI 报告。先选主题，再补资料，最后生成结构化解读。</p>
+            <div className="hero-actions"><a className="primary-btn" href="#featured">看热门技能</a><button className="secondary-btn" type="button" onClick={() => setPackageOpen(true)}>查看套餐</button></div>
+          </div>
+          <div className="hero-banner" aria-label="限时活动"><span className="promo-badge">本月限时</span><h2>新用户首单 50% OFF</h2><p>每日运势免费抽取，深度报告从 ¥6.9 起。</p><div className="promo-details"><div><strong>¥0</strong><span>每日轻量提示</span></div><div><strong>3步</strong><span>问诊后生成报告</span></div></div><ul className="promo-list"><li>首单可用于塔罗、八字、合盘等深度报告</li><li>先由 AI 推荐技能，再进入资料采集</li></ul><button type="button" onClick={() => handleNavClick("聊天")}>立即体验</button></div>
+        </section>
+
+        <section className="store-grid" id="featured">
+          <div className="content-feed">
+            <section className="skill-section">
+              <div className="section-head"><div><p className="eyebrow">Trending</p><h2>现在热门的技能</h2></div><button className="link-btn" type="button" onClick={resetFilters}>{hasSkillFilters ? "清除筛选" : `全部 ${skills.length} 项`}</button></div>
+              <section className="category-strip" aria-label="全部分类">
+                {categories.map(([value, label]) => <button className={`category ${activeCategory === value ? "active" : ""}`} key={value} type="button" onClick={() => setActiveCategory(value)}>{label}</button>)}
+              </section>
+              <div className="skill-list">{filteredSkills.length ? filteredSkills.map((skill) => <SkillCard key={skill.id} skill={skill} onOpen={openSkill} />) : <p className="section-note">没有找到相关技能。</p>}</div>
+            </section>
+
+            <section className="chat-section" id="chat-section">
+              <div className="chat-copy">
+                <p className="eyebrow">AI chat</p>
+                <h2>先聊清楚，再进入测算</h2>
+                <p>这里不是直接给结论，而是先像问诊一样收集背景：你问什么、发生了什么、时间线如何、最想确认哪一点。聊完后再推荐最合适的技能。</p>
+                <div className="chat-actions"><button className="purchase-btn" type="button" onClick={() => setChatQuestion("我想知道 TA 还会不会主动找我")}>套用示例问题</button><button className="secondary-btn" type="button" onClick={() => handleNavClick("技能")}>查看技能</button></div>
+              </div>
+              <form className="chat-preview" aria-label="聊天示例" onSubmit={submitChat}>
+                <div className="chat-bubble user">我想知道 TA 还会不会主动找我。</div>
+                <div className="chat-bubble ai">我会先确认几个关键点：你们分开多久、最近一次互动、是否有明确冲突、你最想验证主动还是复合。</div>
+                <div className="question-list" aria-label="快捷补充问题">{visibleQuestionChips.map((category) => <button key={category.id} type="button" title={`今日提问 ${dailyQuestionStats[category.id] || 0} 次`} onClick={() => setChatQuestion(category.prompt)}>{category.label}</button>)}</div>
+                <label className="chat-input">你的问题<textarea value={chatQuestion} onChange={(event) => setChatQuestion(event.target.value)} placeholder="例如：我们分开两周了，我想知道是否该主动联系。" /></label>
+                <button className="purchase-btn" type="submit">让 AI 推荐技能</button>
+                {displayedChatSuggestion && <div className="suggestion-card"><span>推荐技能</span><strong>{displayedChatSuggestion.title}</strong><p>{displayedChatSuggestion.desc}</p><button type="button" onClick={() => openSkill(displayedChatSuggestion)}>进入测算</button></div>}
+              </form>
+            </section>
+
+            <section className="skill-section">
+              <div className="section-head"><div><p className="eyebrow">New</p><h2>新上线推荐</h2></div><span className="section-note">每日更新</span></div>
+              <div className="skill-list compact-list">{newSkills.length ? newSkills.map((skill) => <SkillCard key={`new-${skill.id}`} skill={skill} onOpen={openSkill} />) : <p className="section-note">暂无新的同类技能。</p>}</div>
+            </section>
+
+            <section className="skill-section">
+              <div className="section-head"><div><p className="eyebrow">Package</p><h2>组合套餐</h2></div><button className="link-btn" type="button" onClick={() => setPackageOpen(true)}>套餐说明</button></div>
+              <div className="package-row">
+                <article className="package-card"><span>5个技能</span><h3>恋爱复盘完全包</h3><p>暧昧、复合、对方想法、合盘、未来30天。</p><strong>¥59.9</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
+                <article className="package-card"><span>4个技能</span><h3>事业财运启动包</h3><p>跳槽、涨薪、副业、现金流窗口。</p><strong>¥49.9</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
+                <article className="package-card"><span>7个技能</span><h3>年度命局总览包</h3><p>八字、紫微、星盘、月运与关键选择。</p><strong>¥88.0</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
+              </div>
+            </section>
+
+            <section className="free-zone" id="free-section">
+              <div className="free-offer">
+                <p className="eyebrow">Free trial</p>
+                <h2>免费体验入口</h2>
+                <p>新用户可以先体验一次轻量提示，理解星命局的提问、分析和升级路径，再决定是否购买深度报告。</p>
+                <button className="purchase-btn" type="button" onClick={() => openSkill(skills[1])}>抽取今日提示</button>
+              </div>
+              <div className="free-steps">
+                <article><span>01</span><strong>输入当前问题</strong><p>一句话说明你今天最在意的事。</p></article>
+                <article><span>02</span><strong>生成轻量结果</strong><p>控制在短报告范围内，快速给出提醒。</p></article>
+                <article><span>03</span><strong>升级深度报告</strong><p>需要更细时再进入塔罗、八字或合盘技能。</p></article>
+              </div>
+            </section>
+
+            <section className="skill-section" id="review-section">
+              <div className="section-head"><div><p className="eyebrow">Reviews</p><h2>用户评价</h2></div><span className="section-note">实时精选</span></div>
+              <div className="review-list">
+                <article><strong>“报告没有只说好听话”</strong><p>它会把牌面、出生信息和现实互动分开讲，最后给出的行动步骤比较清楚。</p><span>复合塔罗用户 · 5分钟前</span></article>
+                <article><strong>“像先问诊再给方案”</strong><p>不是直接甩结论，会先追问背景，适合把纠结的问题整理成可执行选择。</p><span>事业选择用户 · 18分钟前</span></article>
+                <article><strong>“免费一问适合每天看”</strong><p>轻量提醒足够快，想看细节时再买报告，路径比较自然。</p><span>今日免费一问用户 · 32分钟前</span></article>
+              </div>
+            </section>
+          </div>
+
+          <aside className="right-rail">
+            <div className="wallet-card"><div><span>我的星币</span><strong>120</strong></div><button type="button" onClick={() => setPackageOpen(true)}>充值</button></div>
+            <div className="rank-card"><h2>今日榜单</h2><ol>{skills.slice(0, 5).map((skill) => <li key={`rank-${skill.id}`}><button type="button" onClick={() => openSkill(skill)}><strong>{skill.title}</strong><span>{skill.rating} · {skill.users}</span></button></li>)}</ol></div>
+            <div className="free-card"><span>GUIDE</span><h2>新手测算流程</h2><p>先说明问题背景，再由 AI 推荐塔罗、八字、合盘或月运技能。</p><button type="button" onClick={() => scrollToSection("chat-section")}>查看流程</button></div>
+          </aside>
+        </section>
+
+        <footer className="site-footer">
+          <div>
+            <strong>星命局</strong>
+            <p>AI 运势技能商店 · 塔罗、八字、西占、紫微与周易合参</p>
+          </div>
+          <div className="footer-links"><span>用户协议</span><span>隐私保护</span><span>报告说明</span><span>商务合作</span></div>
+        </footer>
+      </main>
+
+      {selectedSkill && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="skillTitle">
+            <div className="dialog-shell">
+              <button className="close-btn" type="button" onClick={() => setSelectedSkill(null)} aria-label="关闭">×</button>
+              <div className="skill-detail">
+                <div className="detail-hero">
+                  <img className={selectedSkill.imageMode || ""} src={selectedSkill.image} alt={selectedSkill.title} />
+                  <div className="detail-copy"><span className="skill-chip">{selectedSkill.tag}</span><h2 id="skillTitle">{selectedSkill.title}</h2><p>{selectedSkill.desc}</p><div className="detail-stats"><span>评分 {selectedSkill.rating}</span><span>用户 {selectedSkill.users}</span><span>{selectedSkill.teacher}</span></div><div className="purchase-panel"><div><strong>¥{selectedSkill.price}</strong> <del>¥{selectedSkill.oldPrice}</del><p>购买前先补齐资料，AI会按报告模板生成结果。</p></div><a className="purchase-btn" href="#order-form">开始测算</a></div></div>
+                </div>
+                <form className="intake-form" id="order-form" onSubmit={submitOrder}>
+                  <h3>报告资料采集</h3>
+                  <div className="intake-grid">
+                    <label>昵称<input name="nickname" placeholder="可选，例如：阿星" /></label>
+                    <label>出生日期<input name="birthDate" type="date" required /></label>
+                    <label>出生时间<input name="birthTime" type="time" required /></label>
+                    <label>出生地<input name="birthPlace" placeholder="例如：杭州" required /></label>
+                    {selectedSkill.fields.map((field, index) => <label key={field}>{field}<input name={`field${index}`} placeholder={`可选，${field}`} /></label>)}
+                  </div>
+                  <label>补充背景<textarea name="context" placeholder="可选，把最近发生的事、你最担心的问题写清楚" /></label>
+                  <button className="purchase-btn" type="submit">生成模拟报告</button>
+                </form>
+                {result && <div className="result-box show"><h3>{result.title}</h3><p><strong>资料完整度：</strong>{result.completeness} · <strong>合参置信度：</strong>{result.confidence}%</p><ul>{result.items.map((item) => <li key={item}>{item}</li>)}</ul></div>}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {packageOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="packageTitle">
+            <div className="dialog-shell small-dialog">
+              <button className="close-btn" type="button" onClick={() => setPackageOpen(false)} aria-label="关闭">×</button>
+              <p className="eyebrow">Membership</p><h2 id="packageTitle">星命局商业化结构</h2>
+              <div className="plan-list"><article><span>单次报告</span><strong>¥6.9 - ¥29.9</strong><p>适合冲动型、主题型消费。</p></article><article><span>技能包</span><strong>¥49.9 起</strong><p>按情感、事业、年度运势打包售卖。</p></article><article><span>会员</span><strong>¥39/月</strong><p>每日免费问、折扣券、月运报告。</p></article></div>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
