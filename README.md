@@ -55,6 +55,7 @@ npm.cmd run start
 - `GET /api/questions/trending?question=跳槽offer`：获取今日热门问题分类按钮
 - `POST /api/chat/recommend`：根据用户问题推荐技能，并记录问题分类统计
 - `POST /api/reports`：生成报告并保存一条报告记录
+- `GET /api/reports`：登录后读取当前账号下的历史报告（需 `Authorization: Bearer <access_token>`）
 
 示例：
 
@@ -67,6 +68,19 @@ POST /api/chat/recommend
 ```
 
 服务端本地运行数据会写入 `.data/`，包括每日问题统计和报告记录。该目录已加入 `.gitignore`。
+
+## 用户登录
+
+当前已接入 Supabase Auth 的邮箱魔法链接登录，页面右上角会显示“登录 / 注册”入口。
+
+除了服务端变量外，还需要补两个公开变量给浏览器端：
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+`NEXT_PUBLIC_SUPABASE_URL` 通常与 `SUPABASE_URL` 相同；`NEXT_PUBLIC_SUPABASE_ANON_KEY` 请从 Supabase 控制台的 API Keys 页面复制 `anon` key。
 
 ## 后续上线建议
 

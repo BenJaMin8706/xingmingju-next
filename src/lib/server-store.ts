@@ -12,6 +12,7 @@ type ReportRecord = {
   id: string;
   createdAt: string;
   skillId: string;
+  userId?: string | null;
   payload: Record<string, unknown>;
   result: unknown;
 };
@@ -115,6 +116,7 @@ export async function appendReport(record: Omit<ReportRecord, "id" | "createdAt"
       id: nextRecord.id,
       created_at: nextRecord.createdAt,
       skill_id: nextRecord.skillId,
+      user_id: nextRecord.userId || null,
       payload: nextRecord.payload,
       result: nextRecord.result,
     });
@@ -131,4 +133,39 @@ export async function appendReport(record: Omit<ReportRecord, "id" | "createdAt"
   }
   await writeFile(reportsPath, JSON.stringify([nextRecord, ...existingReports].slice(0, 200), null, 2), "utf8");
   return nextRecord;
+}
+
+export async function listReportsByUser(userId: string) {
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("reports")
+      .select("id, created_at, skill_id, user_id, payload, result")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (!error) {
+      return (data || []).map((item) => ({
+        id: item.id as string,
+        createdAt: item.created_at as string,
+        skillId: item.skill_id as string,
+        userId: (item.user_id as string | null) || null,
+        payload: item.payload as Record<string, unknown>,
+        result: item.result,
+      }));
+    }
+
+    console.error("[supabase] listReportsByUser", error.message);
+  }
+
+  await ensureDataDir();
+  try {
+    const raw = await readFile(reportsPath, "utf8");
+    const records = JSON.parse(raw) as ReportRecord[];
+    return records.filter((record) => record.userId === userId).slice(0, 50);
+  } catch {
+    return [] as ReportRecord[];
+  }
 }

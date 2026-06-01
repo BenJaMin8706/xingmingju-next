@@ -22,6 +22,16 @@ export type ChatPromptCategory = {
   keywords: string[];
 };
 
+export type ReportResult = {
+  title: string;
+  completeness: "高" | "中";
+  confidence: number;
+  overview: string;
+  items: string[];
+};
+
+import { callAI } from "./ai";
+
 export const skills: Skill[] = [
   {
     id: "reunion-tarot",
@@ -181,13 +191,27 @@ export function createEmptyQuestionStats() {
   return Object.fromEntries(chatPromptCategories.map((category) => [category.id, 0])) as Record<string, number>;
 }
 
+const categoryPriority: Record<string, number> = {
+  wealth: 6,
+  career: 7,
+  match: 5,
+  daily: 5,
+  "core-question": 4,
+  "relationship-stage": 3,
+  "person-info": 3,
+  timeline: 1,
+};
+
 export function findQuestionCategory(question: string) {
   const text = question.trim().toLowerCase();
   const scoredCategories = chatPromptCategories.map((category) => ({
     category,
     score: category.keywords.filter((keyword) => text.includes(keyword.toLowerCase())).length,
   }));
-  const bestMatch = scoredCategories.sort((left, right) => right.score - left.score)[0];
+  const bestMatch = scoredCategories.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    return (categoryPriority[right.category.id] || 0) - (categoryPriority[left.category.id] || 0);
+  })[0];
   return bestMatch.score > 0 ? bestMatch.category : chatPromptCategories[3];
 }
 
@@ -215,20 +239,75 @@ export function recommendSkill(question: string) {
   return skills.find((skill) => skill.id === "reunion-tarot") || skills[0];
 }
 
-export function buildReportResult(input: { nickname?: string; birthTime?: string | null }, skill: Skill) {
+function buildFallbackReportResult(input: { nickname?: string; birthTime?: string | null }, skill: Skill): ReportResult {
   const nickname = input.nickname || "你";
   const hasTime = Boolean(input.birthTime);
-  const confidence = hasTime ? 88 : 78;
 
   return {
     title: `${nickname}的《${skill.title}》`,
     completeness: hasTime ? "高" : "中",
-    confidence,
+    confidence: hasTime ? 88 : 78,
+    overview: "已根据你填写的资料生成一份可执行的行动建议，重点结论以当前阶段最适合采取的小步动作展开。",
     items: [
-      "塔罗层：当前牌面显示问题有推进空间，但需要观察对方或现实环境的连续行动。",
-      hasTime ? "命盘层：出生时间完整，可纳入宫位判断。" : "命盘层：缺少出生时间，紫微与宫位判断降权。",
-      "现实层：你提供的背景会作为主判断依据，AI不会只凭玄学符号下结论。",
-      "行动建议：未来7天适合小步验证，不适合一次性投入过多情绪或资金。",
+      "当前问题有推进空间，但更适合先观察具体反馈，再决定是否继续投入。",
+      hasTime ? "出生时间完整，命盘和时间节奏判断更稳定。" : "缺少出生时间，部分命盘细节会降权处理。",
+      "现实背景会作为主要判断依据，玄学信号只用于辅助识别趋势和节奏。",
+      "未来 7 天建议先做一次低成本验证，再决定是否升级行动。",
     ],
   };
+}
+
+function normalizeAIItems(content: string) {
+  const cleaned = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^[-*\d.、\s]+/, "").trim())
+    .filter(Boolean);
+
+  if (cleaned.length >= 3) {
+    return cleaned.slice(0, 5);
+  }
+
+  return content
+    .split(/[。！？\n]/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 6)
+    .slice(0, 5);
+}
+
+export async function buildReportResult(input: { nickname?: string; birthTime?: string | null; [key: string]: unknown }, skill: Skill): Promise<ReportResult> {
+  const fallback = buildFallbackReportResult(input, skill);
+  const nickname = input.nickname || "你";
+  const userInfo = Object.entries(input)
+    .filter(([k, v]) => typeof v === "string" && v.trim())
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("，");
+  const prompt = `你是一位专业的玄学顾问，请围绕《${skill.title}》输出一份结构化中文建议。用户资料：${userInfo || "无"}。输出要求：\n1. 先用一句话总结当前状态。\n2. 再给出 3 到 5 条具体建议，每条单独一行。\n3. 不要使用 markdown 标题。\n4. 语言明确、克制、可执行，不要空泛安慰。`;
+
+  try {
+    const aiContent = await callAI(
+      [
+        { role: "system", content: "你是专业的玄学顾问，善于结合现实背景给出温和但明确的建议。" },
+        { role: "user", content: prompt },
+      ],
+      { temperature: 0.7, max_tokens: 900 },
+    );
+
+    const items = normalizeAIItems(aiContent);
+    if (!items.length) {
+      return fallback;
+    }
+
+    return {
+      title: `${nickname}的《${skill.title}》`,
+      completeness: fallback.completeness,
+      confidence: fallback.confidence,
+      overview: items[0],
+      items,
+    };
+  } catch (error) {
+    console.error("[report] buildReportResult fallback", error);
+    return fallback;
+  }
 }

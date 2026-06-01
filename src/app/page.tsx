@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 type Skill = {
   id: string;
@@ -17,6 +19,21 @@ type Skill = {
   oldPrice: string;
   tag: string;
   fields: string[];
+};
+
+type ReportResult = {
+  title: string;
+  completeness: string;
+  confidence: number;
+  overview: string;
+  items: string[];
+};
+
+type SavedReport = {
+  id: string;
+  createdAt: string;
+  skillId: string;
+  result: ReportResult;
 };
 
 const skills: Skill[] = [
@@ -185,13 +202,27 @@ function createEmptyQuestionStats() {
   return Object.fromEntries(chatPromptCategories.map((category) => [category.id, 0])) as Record<string, number>;
 }
 
+const categoryPriority: Record<string, number> = {
+  wealth: 6,
+  career: 7,
+  match: 5,
+  daily: 5,
+  "core-question": 4,
+  "relationship-stage": 3,
+  "person-info": 3,
+  timeline: 1,
+};
+
 function findQuestionCategory(question: string) {
   const text = question.trim().toLowerCase();
   const scoredCategories = chatPromptCategories.map((category) => ({
     category,
     score: category.keywords.filter((keyword) => text.includes(keyword.toLowerCase())).length,
   }));
-  const bestMatch = scoredCategories.sort((left, right) => right.score - left.score)[0];
+  const bestMatch = scoredCategories.sort((left, right) => {
+    if (right.score !== left.score) return right.score - left.score;
+    return (categoryPriority[right.category.id] || 0) - (categoryPriority[left.category.id] || 0);
+  })[0];
   return bestMatch.score > 0 ? bestMatch.category : chatPromptCategories[3];
 }
 
@@ -244,6 +275,7 @@ function buildMockResult(form: HTMLFormElement, skill: Skill) {
     title: `${nickname}的《${skill.title}》`,
     completeness: hasTime ? "高" : "中",
     confidence,
+    overview: "已根据你提供的资料整理出当前最值得关注的趋势和下一步行动重点。",
     items: [
       "塔罗层：当前牌面显示问题有推进空间，但需要观察对方或现实环境的连续行动。",
       hasTime ? "命盘层：出生时间完整，可纳入宫位判断。" : "命盘层：缺少出生时间，紫微与宫位判断降权。",
@@ -254,6 +286,7 @@ function buildMockResult(form: HTMLFormElement, skill: Skill) {
 }
 
 export default function Home() {
+  const supabase = useMemo(() => getBrowserSupabase(), []);
   const [activeNav, setActiveNav] = useState<NavLabel>("技能");
   const [activeCategory, setActiveCategory] = useState("all");
   const [query, setQuery] = useState("");
@@ -263,6 +296,15 @@ export default function Home() {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [packageOpen, setPackageOpen] = useState(false);
   const [result, setResult] = useState<ReturnType<typeof buildMockResult> | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
 
   const filteredSkills = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -288,6 +330,45 @@ export default function Home() {
       })
       .catch(() => setDailyQuestionStats(createEmptyQuestionStats()));
   }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      setUser(data.session?.user ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession ?? null);
+      setUser(nextSession?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setSavedReports([]);
+      return;
+    }
+
+    setReportsLoading(true);
+    fetch("/api/reports", {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("failed");
+        return response.json();
+      })
+      .then((data: { reports?: SavedReport[] }) => setSavedReports(data.reports || []))
+      .catch(() => setSavedReports([]))
+      .finally(() => setReportsLoading(false));
+  }, [session?.access_token]);
 
   function resetFilters() {
     setQuery("");
@@ -354,6 +435,41 @@ export default function Home() {
     setResult(null);
   }
 
+  async function submitMagicLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) {
+      setAuthError("登录能力还未配置，请先补 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY。");
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthError("");
+    setAuthMessage("");
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: authEmail.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      setAuthMessage("登录链接已发送，请到邮箱里点击后回到本站。 ");
+    }
+
+    setAuthBusy(false);
+  }
+
+  async function handleLogout() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setAuthOpen(false);
+    setAuthMessage("");
+    setAuthError("");
+  }
+
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedSkill) return;
@@ -363,11 +479,24 @@ export default function Home() {
     try {
       const response = await fetch("/api/reports", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ skillId: selectedSkill.id, payload }),
       });
       const data = (await response.json()) as { result?: ReturnType<typeof buildMockResult> };
       setResult(data.result || buildMockResult(form, selectedSkill));
+
+      if (session?.access_token) {
+        const refresh = await fetch("/api/reports", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (refresh.ok) {
+          const refreshData = (await refresh.json()) as { reports?: SavedReport[] };
+          setSavedReports(refreshData.reports || []);
+        }
+      }
     } catch {
       setResult(buildMockResult(form, selectedSkill));
     }
@@ -382,6 +511,16 @@ export default function Home() {
           <nav className="main-tabs" aria-label="主导航">
             {navItems.map((label) => <button className={activeNav === label ? "active" : ""} key={label} type="button" onClick={() => handleNavClick(label)} aria-current={activeNav === label ? "page" : undefined}>{label}</button>)}
           </nav>
+          <div className="header-actions">
+            {user ? (
+              <>
+                <button className="ghost-btn" type="button" onClick={() => scrollToSection("account-section")}>我的报告</button>
+                <button className="secondary-btn" type="button" onClick={handleLogout}>退出</button>
+              </>
+            ) : (
+              <button className="secondary-btn" type="button" onClick={() => setAuthOpen(true)}>登录 / 注册</button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -462,6 +601,40 @@ export default function Home() {
           </div>
 
           <aside className="right-rail">
+            <div className="account-card" id="account-section">
+              <div className="section-head compact-head">
+                <div>
+                  <p className="eyebrow">Account</p>
+                  <h2>我的报告</h2>
+                </div>
+                {!user && <button className="link-btn" type="button" onClick={() => setAuthOpen(true)}>登录</button>}
+              </div>
+              {user ? (
+                <>
+                  <p className="section-note">当前账号：{user.email || user.phone || user.id.slice(0, 8)}</p>
+                  {reportsLoading ? (
+                    <p className="section-note">正在加载历史报告...</p>
+                  ) : savedReports.length ? (
+                    <div className="account-list">
+                      {savedReports.map((report) => (
+                        <article key={report.id}>
+                          <strong>{report.result?.title || report.skillId}</strong>
+                          <p>{report.result?.overview || "已生成报告，可继续查看详情。"}</p>
+                          <span>{new Date(report.createdAt).toLocaleString("zh-CN", { hour12: false })}</span>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="section-note">你还没有绑定到账号的历史报告，登录后新生成的报告会自动归档。</p>
+                  )}
+                </>
+              ) : (
+                <div className="account-empty">
+                  <p>登录后可保存你的历史报告、跨设备查看，并持续积累个人运势档案。</p>
+                  <button className="purchase-btn" type="button" onClick={() => setAuthOpen(true)}>邮箱登录</button>
+                </div>
+              )}
+            </div>
             <div className="wallet-card"><div><span>我的星币</span><strong>120</strong></div><button type="button" onClick={() => setPackageOpen(true)}>充值</button></div>
             <div className="rank-card"><h2>今日榜单</h2><ol>{skills.slice(0, 5).map((skill) => <li key={`rank-${skill.id}`}><button type="button" onClick={() => openSkill(skill)}><strong>{skill.title}</strong><span>{skill.rating} · {skill.users}</span></button></li>)}</ol></div>
             <div className="free-card"><span>GUIDE</span><h2>新手测算流程</h2><p>先说明问题背景，再由 AI 推荐塔罗、八字、合盘或月运技能。</p><button type="button" onClick={() => scrollToSection("chat-section")}>查看流程</button></div>
@@ -497,9 +670,9 @@ export default function Home() {
                     {selectedSkill.fields.map((field, index) => <label key={field}>{field}<input name={`field${index}`} placeholder={`可选，${field}`} /></label>)}
                   </div>
                   <label>补充背景<textarea name="context" placeholder="可选，把最近发生的事、你最担心的问题写清楚" /></label>
-                  <button className="purchase-btn" type="submit">生成模拟报告</button>
+                  <button className="purchase-btn" type="submit">生成 AI 报告</button>
                 </form>
-                {result && <div className="result-box show"><h3>{result.title}</h3><p><strong>资料完整度：</strong>{result.completeness} · <strong>合参置信度：</strong>{result.confidence}%</p><ul>{result.items.map((item) => <li key={item}>{item}</li>)}</ul></div>}
+                {result && <div className="result-box show"><h3>{result.title}</h3><p><strong>资料完整度：</strong>{result.completeness} · <strong>合参置信度：</strong>{result.confidence}%</p><p>{result.overview}</p><ul>{result.items.map((item) => <li key={item}>{item}</li>)}</ul></div>}
               </div>
             </div>
           </section>
@@ -513,6 +686,28 @@ export default function Home() {
               <button className="close-btn" type="button" onClick={() => setPackageOpen(false)} aria-label="关闭">×</button>
               <p className="eyebrow">Membership</p><h2 id="packageTitle">星命局商业化结构</h2>
               <div className="plan-list"><article><span>单次报告</span><strong>¥6.9 - ¥29.9</strong><p>适合冲动型、主题型消费。</p></article><article><span>技能包</span><strong>¥49.9 起</strong><p>按情感、事业、年度运势打包售卖。</p></article><article><span>会员</span><strong>¥39/月</strong><p>每日免费问、折扣券、月运报告。</p></article></div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {authOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+            <div className="dialog-shell small-dialog">
+              <button className="close-btn" type="button" onClick={() => setAuthOpen(false)} aria-label="关闭">×</button>
+              <p className="eyebrow">Auth</p>
+              <h2 id="authTitle">登录 / 注册</h2>
+              <p className="section-note">当前采用邮箱魔法链接登录。输入邮箱后，去收件箱点击登录链接即可回到本站完成登录。</p>
+              <form className="auth-form" onSubmit={submitMagicLink}>
+                <label>
+                  邮箱
+                  <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="例如：you@example.com" required />
+                </label>
+                <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "发送中..." : "发送登录链接"}</button>
+              </form>
+              {authMessage ? <p className="helper-text success-text">{authMessage}</p> : null}
+              {authError ? <p className="helper-text error-text">{authError}</p> : null}
             </div>
           </section>
         </div>
