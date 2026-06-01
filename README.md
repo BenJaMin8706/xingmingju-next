@@ -78,9 +78,10 @@ POST /api/chat/recommend
 ```text
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-`NEXT_PUBLIC_SUPABASE_URL` 通常与 `SUPABASE_URL` 相同；`NEXT_PUBLIC_SUPABASE_ANON_KEY` 请从 Supabase 控制台的 API Keys 页面复制 `anon` key。
+`NEXT_PUBLIC_SUPABASE_URL` 通常与 `SUPABASE_URL` 相同。Supabase 新版控制台优先提供 `publishable key`，因此推荐设置 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`；如果你的项目仍在使用旧版 key，也可以继续设置 `NEXT_PUBLIC_SUPABASE_ANON_KEY`。
 
 ## 后续上线建议
 
