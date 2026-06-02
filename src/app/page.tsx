@@ -303,6 +303,7 @@ export default function Home() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authDirectUrl, setAuthDirectUrl] = useState("");
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
 
@@ -445,18 +446,25 @@ export default function Home() {
     setAuthBusy(true);
     setAuthError("");
     setAuthMessage("");
+    setAuthDirectUrl("");
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: authEmail.trim(),
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
-    });
-
-    if (error) {
-      setAuthError(error.message);
-    } else {
-      setAuthMessage("登录链接已发送，请到邮箱里点击后回到本站。 ");
+    try {
+      const response = await fetch("/api/auth/send-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail.trim() }),
+      });
+      const data = await response.json();
+      if (data.error) {
+        setAuthError(data.error);
+      } else {
+        setAuthMessage("登录链接已发送，请到邮箱里点击。");
+        if (data.verifyUrl) {
+          setAuthDirectUrl(data.verifyUrl);
+        }
+      }
+    } catch {
+      setAuthError("网络错误，请稍后重试");
     }
 
     setAuthBusy(false);
@@ -708,6 +716,15 @@ export default function Home() {
               </form>
               {authMessage ? <p className="helper-text success-text">{authMessage}</p> : null}
               {authError ? <p className="helper-text error-text">{authError}</p> : null}
+              {authDirectUrl ? (
+                <p className="helper-text" style={{ wordBreak: "break-all", marginTop: 8 }}>
+                  👉 也可以直接点此链接登录：
+                  <br />
+                  <a href={authDirectUrl} style={{ color: "#7c3aed", textDecoration: "underline" }}>
+                    {authDirectUrl}
+                  </a>
+                </p>
+              ) : null}
             </div>
           </section>
         </div>
