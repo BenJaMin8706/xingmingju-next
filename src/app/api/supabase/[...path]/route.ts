@@ -21,7 +21,7 @@ async function proxy(
 
     // 读取 body 为文本确保可靠转发
     const body = request.body
-      ? await request.text()
+      ? await request.clone().arrayBuffer()
       : undefined;
 
     const upstream = await fetch(targetUrl, {
@@ -30,13 +30,8 @@ async function proxy(
       body,
     });
 
-    const responseHeaders = new Headers();
-    upstream.headers.forEach((value, key) => {
-      const lower = key.toLowerCase();
-      if (lower !== "content-encoding") {
-        responseHeaders.set(key, value);
-      }
-    });
+    // 透传所有响应头（不再错误地去掉 content-encoding）
+    const responseHeaders = new Headers(upstream.headers);
     responseHeaders.set("access-control-allow-origin", "*");
     responseHeaders.set("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     responseHeaders.set("access-control-allow-headers", "*");
