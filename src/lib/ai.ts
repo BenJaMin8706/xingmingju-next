@@ -1,13 +1,22 @@
-// AI API 封装，兼容 OpenAI 格式，支持 BestMax/DeepSeek/通义千问
+// AI API 封装，兼容 OpenAI 格式
+// 支持: BestMax代理 / DeepSeek直连 / 通义千问
+// 环境变量:
+//   AI_API_BASE_URL - API 地址 (默认 BestMax)
+//   AI_API_KEY      - API 密钥
+//   AI_MODEL        - 模型名 (默认 deepseek-v3，可设为 deepseek-chat / gpt-4o 等)
 
 export type AIMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
-const BASE_URL = process.env.AI_API_BASE_URL || "https://api.bestmax.cc";
-const API_KEY = process.env.AI_API_KEY;
-const MODEL = process.env.AI_MODEL || "deepseek-v3";
+// 默认用 BestMax 代理，如果设置 DEEPSEEK_API_KEY 则直连 DeepSeek
+const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
+const BASE_URL = DEEPSEEK_KEY
+  ? "https://api.deepseek.com"
+  : (process.env.AI_API_BASE_URL || "https://api.bestmax.cc");
+const API_KEY = DEEPSEEK_KEY || process.env.AI_API_KEY;
+const MODEL = process.env.AI_MODEL || (DEEPSEEK_KEY ? "deepseek-chat" : "deepseek-v3");
 
 export async function callAI(messages: AIMessage[], options?: { temperature?: number; max_tokens?: number }) {
   if (!API_KEY) throw new Error("AI_API_KEY 未配置");
