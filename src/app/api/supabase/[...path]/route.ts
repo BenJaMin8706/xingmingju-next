@@ -4,31 +4,67 @@ const SUPABASE_URL = "https://ycefjltmcjkwavlihcsu.supabase.co";
 
 async function proxy(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  context: { params: Promise<{ path: string[] }> }
 ) {
-  const { path } = await params;
-  const targetUrl = `${SUPABASE_URL}/${path.join("/")}${new URL(request.url).search}`;
+  try {
+    const { path } = await context.params;
+    const search = new URL(request.url).search;
+    const targetUrl = `${SUPABASE_URL}/${path.join("/")}${search}`;
 
-  // 构建干净的请求头（移除 Next.js 内部头）
-  const headers = new Headers();
-  request.headers.forEach((value, key) => {
-    const lower = key.toLowerCase();
-    if (!lower.startsWith("x-forwarded-") && lower !== "host" && lower !== "content-length") {
-      headers.set(key, value);
-    }
-  });
+    const headers = new Headers();
+    request.headers.forEach((value, key) => {
+      const lower = key.toLowerCase();
+      if (!lower.startsWith("x-forwarded-") && lower !== "host") {
+        headers.set(key, value);
+      }
+    });
 
-  const response = await fetch(targetUrl, {
-    method: request.method,
-    headers,
-    body: request.body,
-  });
+    // 读取 body 为文本确保可靠转发
+    const body = request.body
+      ? await request.text()
+      : undefined;
 
-  return new NextResponse(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
+    const upstream = await fetch(targetUrl, {
+      method: request.method,
+      headers,
+      body,
+    });
+
+    const responseHeaders = new Headers();
+    upstream.headers.forEach((value, key) => {
+      const lower = key.toLowerCase();
+      if (lower !== "content-encoding") {
+        responseHeaders.set(key, value);
+      }
+    });
+    responseHeaders.set("access-control-allow-origin", "*");
+    responseHeaders.set("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    responseHeaders.set("access-control-allow-headers", "*");
+
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: responseHeaders,
+    });
+  } catch (err) {
+    console.error("proxy error", err);
+    return NextResponse.json(
+      { error: "proxy_error", detail: String(err) },
+      { status: 502 }
+    );
+  }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+      "access-control-allow-headers": "*",
+    },
   });
 }
 
 export { proxy as GET, proxy as POST, proxy as PUT, proxy as PATCH, proxy as DELETE };
+
