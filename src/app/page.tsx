@@ -309,6 +309,7 @@ export default function Home() {
   const [credits, setCredits] = useState(0);
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyBusy, setBuyBusy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const filteredSkills = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -350,7 +351,10 @@ export default function Home() {
           body: JSON.stringify({ addCredits: addedCredits }),
         })
           .then((r) => r.json())
-          .then((d: { credits?: number }) => setCredits(d.credits || 0))
+          .then((d: { credits?: number }) => {
+            setCredits(d.credits || 0);
+            setToast(`🎉 支付成功！+${addedCredits} 星币已到账`);
+          })
           .catch(() => {});
       }
       window.history.replaceState({}, "", "/");
@@ -402,7 +406,27 @@ export default function Home() {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((r) => r.json())
-      .then((d: { credits?: number }) => setCredits(d.credits || 0))
+      .then((d: { credits?: number; isNew?: boolean }) => {
+        setCredits(d.credits || 0);
+        // New user: grant welcome credits on first login
+        if (d.isNew || (d.credits === 0 && !localStorage.getItem("xingmingju-welcome-granted"))) {
+          fetch("/api/user/credits", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ addCredits: 10 }),
+          })
+            .then((r2) => r2.json())
+            .then((d2: { credits?: number }) => {
+              setCredits(d2.credits || 0);
+              setToast("🎁 首次登录赠送 10 星币体验金");
+              localStorage.setItem("xingmingju-welcome-granted", "1");
+            })
+            .catch(() => {});
+        }
+      })
       .catch(() => {});
   }, [session?.access_token]);
 
@@ -598,6 +622,12 @@ export default function Home() {
 
   return (
     <>
+      {toast && (
+        <div className="toast-bar" role="status" aria-live="polite">
+          <span>{toast}</span>
+          <button type="button" onClick={() => setToast(null)} aria-label="关闭">×</button>
+        </div>
+      )}
       <header className="app-header">
         <div className="header-inner">
           <a className="brand" href="#top" aria-label="星命局首页"><span className="brand-mark">局</span><span>星命局</span></a>
