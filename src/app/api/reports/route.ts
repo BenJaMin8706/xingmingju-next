@@ -18,43 +18,34 @@ const SKILL_CREDIT_COSTS: Record<string, number> = {
   "daily-oracle": 0, // free
 };
 
-async function getCredits(userId: string): Promise<number> {
+async function getCreditsFromAuth(userId: string): Promise<number> {
   if (!userId || userId === "anonymous") return 0;
   const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const { data } = await supabase
-        .from("user_credits")
-        .select("credits")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (data) return data.credits;
-    } catch { /* fallback */ }
+  if (!supabase) return 0;
+  try {
+    const { data, error } = await supabase.auth.admin.getUserById(userId);
+    if (error || !data?.user) return 0;
+    return (data.user.user_metadata as Record<string, unknown>)?.credits as number || 0;
+  } catch {
+    return 0;
   }
-  return 0;
 }
 
-async function deductCredits(userId: string, amount: number): Promise<number> {
-  if (!userId || userId === "anonymous" || amount <= 0) return 0;
+async function deductCreditsFromAuth(userId: string, amount: number): Promise<number> {
+  if (!userId || userId === "anonymous" || amount <= 0) return -1;
   const supabase = getSupabase();
-  if (supabase) {
-    try {
-      const { data: existing } = await supabase
-        .from("user_credits")
-        .select("id,credits")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (existing && existing.credits >= amount) {
-        const newCredits = existing.credits - amount;
-        await supabase
-          .from("user_credits")
-          .update({ credits: newCredits })
-          .eq("id", existing.id);
-        return newCredits;
-      }
-    } catch { /* fallback */ }
+  if (!supabase) return -1;
+  try {
+    const { data } = await supabase.auth.admin.getUserById(userId);
+    if (!data?.user) return -1;
+    const current = (data.user.user_metadata as Record<string, unknown>)?.credits as number || 0;
+    if (current < amount) return -1;
+    const newCredits = current - amount;
+    await supabase.auth.admin.updateUserById(userId, { user_metadata: { credits: newCredits } });
+    return newCredits;
+  } catch {
+    return -1;
   }
-  return -1;
 }
 
 export async function GET(request: NextRequest) {
@@ -85,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   // Check credits for paid skills
   if (creditCost > 0) {
-    const balance = await getCredits(userId);
+    const balance = await getCreditsFromAuth(userId);
     if (balance < creditCost) {
       return NextResponse.json({
         error: "星币不足",
@@ -107,7 +98,7 @@ export async function POST(request: NextRequest) {
 
   // Deduct credits
   if (creditCost > 0) {
-    await deductCredits(userId, creditCost);
+    await deductCreditsFromAuth(userId, creditCost);
   }
 
   const record = await appendReport({ skillId: skill.id, userId, payload, result });

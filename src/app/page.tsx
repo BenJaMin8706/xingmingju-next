@@ -336,14 +336,16 @@ export default function Home() {
 
     // Handle Stripe return
     const params = new URLSearchParams(window.location.search);
-    if (params.get("payment") === "success") {
+    const paymentStatus = params.get("payment");
+    if (paymentStatus === "success") {
       const addedCredits = parseInt(params.get("credits") || "0", 10);
-      if (addedCredits > 0 && session?.access_token) {
+      if (addedCredits > 0) {
+        // Try to add credits server-side regardless of login state
         fetch("/api/user/credits", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
           },
           body: JSON.stringify({ addCredits: addedCredits }),
         })
@@ -351,6 +353,8 @@ export default function Home() {
           .then((d: { credits?: number }) => setCredits(d.credits || 0))
           .catch(() => {});
       }
+      window.history.replaceState({}, "", "/");
+    } else if (paymentStatus === "cancelled") {
       window.history.replaceState({}, "", "/");
     }
   }, []);
@@ -812,7 +816,7 @@ export default function Home() {
                 ))}
               </div>
               <p className="section-note" style={{ fontSize: 12, marginTop: 8 }}>
-                目前为演示模式，点击购买直接到账。接入 Stripe 后可正式收款。
+                Stripe 安全支付 · 购买后自动到账 · 测试模式
               </p>
             </div>
           </section>
