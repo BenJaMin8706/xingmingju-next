@@ -47,9 +47,9 @@ const skills: Skill[] = [
     imageMode: "contain-image",
     rating: "4.9",
     users: "10万+",
-    discount: "18%",
-    price: "19.9",
-    oldPrice: "24.0",
+    discount: "17%",
+    price: "20",
+    oldPrice: "24",
     tag: "情感热门",
     fields: ["你的出生日期", "对方信息", "分开多久", "最近一次互动", "你最想确认的事"],
   },
@@ -64,7 +64,7 @@ const skills: Skill[] = [
     users: "50万+",
     discount: "FREE",
     price: "0",
-    oldPrice: "6.9",
+    oldPrice: "7",
     tag: "免费",
     fields: ["今天最重要的事", "当前情绪", "想问的具体问题"],
   },
@@ -78,8 +78,8 @@ const skills: Skill[] = [
     rating: "4.7",
     users: "8万+",
     discount: "12%",
-    price: "22.9",
-    oldPrice: "26.0",
+    price: "23",
+    oldPrice: "26",
     tag: "财运",
     fields: ["出生年月日时", "出生地", "职业阶段", "当前收入压力", "正在考虑的行动"],
   },
@@ -92,9 +92,9 @@ const skills: Skill[] = [
     image: "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=500&q=82",
     rating: "4.9",
     users: "6万+",
-    discount: "15%",
-    price: "29.9",
-    oldPrice: "35.0",
+    discount: "14%",
+    price: "30",
+    oldPrice: "35",
     tag: "深度报告",
     fields: ["出生年月日时", "出生地", "当前感情状态", "理想对象", "过去半年关系变化"],
   },
@@ -107,9 +107,9 @@ const skills: Skill[] = [
     image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=500&q=82",
     rating: "4.8",
     users: "5万+",
-    discount: "9%",
-    price: "18.8",
-    oldPrice: "20.6",
+    discount: "10%",
+    price: "19",
+    oldPrice: "21",
     tag: "事业",
     fields: ["出生信息", "当前岗位", "备选机会", "最担心的风险", "决定期限"],
   },
@@ -122,9 +122,9 @@ const skills: Skill[] = [
     image: "https://images.unsplash.com/photo-1465101162946-4377e57745c3?auto=format&fit=crop&w=500&q=82",
     rating: "4.8",
     users: "12万+",
-    discount: "20%",
-    price: "16.9",
-    oldPrice: "21.0",
+    discount: "19%",
+    price: "17",
+    oldPrice: "21",
     tag: "建档必看",
     fields: ["出生年月日", "精确出生时间", "出生城市", "想重点了解的领域"],
   },
@@ -137,9 +137,9 @@ const skills: Skill[] = [
     image: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=500&q=82",
     rating: "4.6",
     users: "3万+",
-    discount: "10%",
-    price: "24.9",
-    oldPrice: "27.6",
+    discount: "11%",
+    price: "25",
+    oldPrice: "28",
     tag: "合盘",
     fields: ["双方出生信息", "关系阶段", "相处时长", "最大矛盾", "是否考虑婚姻"],
   },
@@ -152,9 +152,9 @@ const skills: Skill[] = [
     image: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?auto=format&fit=crop&w=500&q=82",
     rating: "4.9",
     users: "20万+",
-    discount: "25%",
-    price: "12.9",
-    oldPrice: "17.2",
+    discount: "24%",
+    price: "13",
+    oldPrice: "17",
     tag: "月运",
     fields: ["出生信息", "本月目标", "感情状态", "工作状态", "财务压力"],
   },
@@ -259,7 +259,7 @@ function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: (skill: Skill) => 
         <span className="teacher">by {skill.teacher}</span>
         <span className="rating"><strong>{skill.rating}</strong> · 用户 {skill.users}</span>
         <span className="desc">{skill.desc}</span>
-        <span className="price-row"><strong>¥{skill.price}</strong><del>¥{skill.oldPrice}</del><span className="discount">{discount}</span></span>
+        <span className="price-row"><strong>{skill.price} 星币</strong>{skill.price !== "0" && <del>{skill.oldPrice} 星币</del>}<span className="discount">{discount}</span></span>
       </span>
     </button>
   );
@@ -701,9 +701,9 @@ export default function Home() {
             <section className="skill-section">
               <div className="section-head"><div><p className="eyebrow">Package</p><h2>组合套餐</h2></div><button className="link-btn" type="button" onClick={() => setPackageOpen(true)}>套餐说明</button></div>
               <div className="package-row">
-                <article className="package-card"><span>5个技能</span><h3>恋爱复盘完全包</h3><p>暧昧、复合、对方想法、合盘、未来30天。</p><strong>¥59.9</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
-                <article className="package-card"><span>4个技能</span><h3>事业财运启动包</h3><p>跳槽、涨薪、副业、现金流窗口。</p><strong>¥49.9</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
-                <article className="package-card"><span>7个技能</span><h3>年度命局总览包</h3><p>八字、紫微、星盘、月运与关键选择。</p><strong>¥88.0</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
+                <article className="package-card"><span>5个技能</span><h3>恋爱复盘完全包</h3><p>暧昧、复合、对方想法、合盘、未来30天。</p><strong>60 星币</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
+                <article className="package-card"><span>4个技能</span><h3>事业财运启动包</h3><p>跳槽、涨薪、副业、现金流窗口。</p><strong>50 星币</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
+                <article className="package-card"><span>7个技能</span><h3>年度命局总览包</h3><p>八字、紫微、星盘、月运与关键选择。</p><strong>88 星币</strong><button type="button" onClick={() => setPackageOpen(true)}>查看详情</button></article>
               </div>
             </section>
 
@@ -785,7 +785,7 @@ export default function Home() {
               <div className="skill-detail">
                 <div className="detail-hero">
                   <img className={selectedSkill.imageMode || ""} src={selectedSkill.image} alt={selectedSkill.title} />
-                  <div className="detail-copy"><span className="skill-chip">{selectedSkill.tag}</span><h2 id="skillTitle">{selectedSkill.title}</h2><p>{selectedSkill.desc}</p><div className="detail-stats"><span>评分 {selectedSkill.rating}</span><span>用户 {selectedSkill.users}</span><span>{selectedSkill.teacher}</span></div><div className="purchase-panel"><div><strong>¥{selectedSkill.price}</strong> <del>¥{selectedSkill.oldPrice}</del><p>购买前先补齐资料，AI会按报告模板生成结果。</p></div><a className="purchase-btn" href="#order-form">开始测算</a></div></div>
+                  <div className="detail-copy"><span className="skill-chip">{selectedSkill.tag}</span><h2 id="skillTitle">{selectedSkill.title}</h2><p>{selectedSkill.desc}</p><div className="detail-stats"><span>评分 {selectedSkill.rating}</span><span>用户 {selectedSkill.users}</span><span>{selectedSkill.teacher}</span></div><div className="purchase-panel"><div><strong>{selectedSkill.price} 星币</strong> {selectedSkill.price !== "0" && <><del>{selectedSkill.oldPrice} 星币</del></>}<p>购买前先补齐资料，AI会按报告模板生成结果。</p></div><a className="purchase-btn" href="#order-form">开始测算</a></div></div>
                 </div>
                 <form className="intake-form" id="order-form" onSubmit={submitOrder}>
                   <h3>报告资料采集</h3>
@@ -812,7 +812,7 @@ export default function Home() {
             <div className="dialog-shell small-dialog">
               <button className="close-btn" type="button" onClick={() => setPackageOpen(false)} aria-label="关闭">×</button>
               <p className="eyebrow">Membership</p><h2 id="packageTitle">星命局商业化结构</h2>
-              <div className="plan-list"><article><span>单次报告</span><strong>¥6.9 - ¥29.9</strong><p>适合冲动型、主题型消费。</p></article><article><span>技能包</span><strong>¥49.9 起</strong><p>按情感、事业、年度运势打包售卖。</p></article><article><span>会员</span><strong>¥39/月</strong><p>每日免费问、折扣券、月运报告。</p></article></div>
+              <div className="plan-list"><article><span>单次报告</span><strong>13 - 30 星币</strong><p>适合冲动型、主题型消费。</p></article><article><span>技能包</span><strong>50 星币起</strong><p>按情感、事业、年度运势打包售卖。</p></article><article><span>会员</span><strong>39 星币/月</strong><p>每日免费问、折扣券、月运报告。</p></article></div>
             </div>
           </section>
         </div>
