@@ -311,6 +311,13 @@ export default function Home() {
   const [buyBusy, setBuyBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   const filteredSkills = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return skills.filter((skill) => {
