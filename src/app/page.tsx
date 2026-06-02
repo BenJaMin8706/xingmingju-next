@@ -306,6 +306,9 @@ export default function Home() {
   const [authDirectUrl, setAuthDirectUrl] = useState("");
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [credits, setCredits] = useState(0);
+  const [buyOpen, setBuyOpen] = useState(false);
+  const [buyBusy, setBuyBusy] = useState(false);
 
   const filteredSkills = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -330,6 +333,26 @@ export default function Home() {
         if (data.counts) setDailyQuestionStats({ ...createEmptyQuestionStats(), ...data.counts });
       })
       .catch(() => setDailyQuestionStats(createEmptyQuestionStats()));
+
+    // Handle Stripe return
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success") {
+      const addedCredits = parseInt(params.get("credits") || "0", 10);
+      if (addedCredits > 0 && session?.access_token) {
+        fetch("/api/user/credits", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ addCredits: addedCredits }),
+        })
+          .then((r) => r.json())
+          .then((d: { credits?: number }) => setCredits(d.credits || 0))
+          .catch(() => {});
+      }
+      window.history.replaceState({}, "", "/");
+    }
   }, []);
 
   useEffect(() => {
@@ -353,6 +376,7 @@ export default function Home() {
   useEffect(() => {
     if (!session?.access_token) {
       setSavedReports([]);
+      setCredits(0);
       return;
     }
 
@@ -369,6 +393,13 @@ export default function Home() {
       .then((data: { reports?: SavedReport[] }) => setSavedReports(data.reports || []))
       .catch(() => setSavedReports([]))
       .finally(() => setReportsLoading(false));
+
+    fetch("/api/user/credits", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then((r) => r.json())
+      .then((d: { credits?: number }) => setCredits(d.credits || 0))
+      .catch(() => {});
   }, [session?.access_token]);
 
   function resetFilters() {
@@ -478,6 +509,41 @@ export default function Home() {
     setAuthError("");
   }
 
+  async function handleBuyCredits(packageId: string) {
+    setBuyBusy(true);
+    try {
+      const resp = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packageId,
+          userId: user?.id || "anonymous",
+        }),
+      });
+      const data = await resp.json();
+      if (data.demo) {
+        // Demo mode: directly add credits
+        await fetch("/api/user/credits", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token || ""}`,
+          },
+          body: JSON.stringify({ addCredits: data.message?.match(/\d+/)?.[0] || 100 }),
+        });
+        setCredits((c) => c + 100);
+        alert("演示模式：已充值 100 星币！");
+      } else if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("支付暂不可用，请稍后再试");
+      }
+    } catch {
+      alert("网络错误");
+    }
+    setBuyBusy(false);
+  }
+
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedSkill) return;
@@ -493,10 +559,26 @@ export default function Home() {
         },
         body: JSON.stringify({ skillId: selectedSkill.id, payload }),
       });
+
+      if (response.status === 402) {
+        const errData = await response.json() as { needed?: number; message?: string };
+        alert(errData.message || "星币不足，请先充值");
+        setBuyOpen(true);
+        return;
+      }
+
       const data = (await response.json()) as { result?: ReturnType<typeof buildMockResult> };
       setResult(data.result || buildMockResult(form, selectedSkill));
 
+      // Refresh credits after report generation
       if (session?.access_token) {
+        fetch("/api/user/credits", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+          .then((r) => r.json())
+          .then((d: { credits?: number }) => setCredits(d.credits || 0))
+          .catch(() => {});
+
         const refresh = await fetch("/api/reports", {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
@@ -643,7 +725,7 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <div className="wallet-card"><div><span>我的星币</span><strong>120</strong></div><button type="button" onClick={() => setPackageOpen(true)}>充值</button></div>
+            <div className="wallet-card"><div><span>我的星币</span><strong>{credits}</strong></div><button type="button" onClick={() => setBuyOpen(true)}>充值</button></div>
             <div className="rank-card"><h2>今日榜单</h2><ol>{skills.slice(0, 5).map((skill) => <li key={`rank-${skill.id}`}><button type="button" onClick={() => openSkill(skill)}><strong>{skill.title}</strong><span>{skill.rating} · {skill.users}</span></button></li>)}</ol></div>
             <div className="free-card"><span>GUIDE</span><h2>新手测算流程</h2><p>先说明问题背景，再由 AI 推荐塔罗、八字、合盘或月运技能。</p><button type="button" onClick={() => scrollToSection("chat-section")}>查看流程</button></div>
           </aside>
@@ -694,6 +776,44 @@ export default function Home() {
               <button className="close-btn" type="button" onClick={() => setPackageOpen(false)} aria-label="关闭">×</button>
               <p className="eyebrow">Membership</p><h2 id="packageTitle">星命局商业化结构</h2>
               <div className="plan-list"><article><span>单次报告</span><strong>¥6.9 - ¥29.9</strong><p>适合冲动型、主题型消费。</p></article><article><span>技能包</span><strong>¥49.9 起</strong><p>按情感、事业、年度运势打包售卖。</p></article><article><span>会员</span><strong>¥39/月</strong><p>每日免费问、折扣券、月运报告。</p></article></div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {buyOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="buyTitle">
+            <div className="dialog-shell small-dialog">
+              <button className="close-btn" type="button" onClick={() => setBuyOpen(false)} aria-label="关闭">×</button>
+              <p className="eyebrow">Credits</p>
+              <h2 id="buyTitle">购买星币</h2>
+              <p className="section-note" style={{ marginBottom: 12 }}>当前余额：<strong>{credits}</strong> 星币</p>
+              <div className="plan-list">
+                {[
+                  { id: "100", name: "100 星币", price: "¥10", desc: "适合试用" },
+                  { id: "500", name: "500 星币", price: "¥45", desc: "9折 · 适合深度体验" },
+                  { id: "1200", name: "1200 星币", price: "¥99", desc: "82折 · 最划算" },
+                ].map((pkg) => (
+                  <article key={pkg.id}>
+                    <span>{pkg.name}</span>
+                    <strong>{pkg.price}</strong>
+                    <p>{pkg.desc}</p>
+                    <button
+                      className="purchase-btn"
+                      style={{ width: "100%", marginTop: 8 }}
+                      type="button"
+                      disabled={buyBusy}
+                      onClick={() => handleBuyCredits(pkg.id)}
+                    >
+                      {buyBusy ? "处理中..." : "购买"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <p className="section-note" style={{ fontSize: 12, marginTop: 8 }}>
+                目前为演示模式，点击购买直接到账。接入 Stripe 后可正式收款。
+              </p>
             </div>
           </section>
         </div>
