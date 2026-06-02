@@ -15,10 +15,11 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const adminKey = request.headers.get("x-admin-key") || "";
-  // Use dedicated ADMIN_API_KEY if set, otherwise fallback to a key derived from the service role
-  const expectedKey = process.env.ADMIN_API_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 32);
+  // TODO: move this to Vercel env var ADMIN_API_KEY for production
+  const FALLBACK_KEY = "BKhyYzOu1DjgWuPIWyeGm/GPy/XC4fliXXInw1gYnoE";
+  const expectedKey = process.env.ADMIN_API_KEY || FALLBACK_KEY;
 
-  if (!expectedKey || adminKey !== expectedKey) {
+  if (adminKey !== expectedKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
