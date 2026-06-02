@@ -663,7 +663,7 @@ export default function Home() {
             <p>星命局把塔罗、八字、西占、紫微、周易包装成一个个可购买的 AI 报告。先选主题，再补资料，最后生成结构化解读。</p>
             <div className="hero-actions"><a className="primary-btn" href="#featured">看热门技能</a><button className="secondary-btn" type="button" onClick={() => setPackageOpen(true)}>查看套餐</button></div>
           </div>
-          <div className="hero-banner" aria-label="限时活动"><span className="promo-badge">本月限时</span><h2>新用户首单 50% OFF</h2><p>每日运势免费抽取，深度报告从 ¥6.9 起。</p><div className="promo-details"><div><strong>¥0</strong><span>每日轻量提示</span></div><div><strong>3步</strong><span>问诊后生成报告</span></div></div><ul className="promo-list"><li>首单可用于塔罗、八字、合盘等深度报告</li><li>先由 AI 推荐技能，再进入资料采集</li></ul><button type="button" onClick={() => handleNavClick("聊天")}>立即体验</button></div>
+          <div className="hero-banner" aria-label="限时活动"><span className="promo-badge">本月限时</span><h2>新用户首单 50% OFF</h2><p>每日运势免费抽取，深度报告从 13 星币起。</p><div className="promo-details"><div><strong>0 星币</strong><span>每日轻量提示</span></div><div><strong>3步</strong><span>问诊后生成报告</span></div></div><ul className="promo-list"><li>首单可用于塔罗、八字、合盘等深度报告</li><li>先由 AI 推荐技能，再进入资料采集</li></ul><button type="button" onClick={() => handleNavClick("聊天")}>立即体验</button></div>
         </section>
 
         <section className="store-grid" id="featured">
