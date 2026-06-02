@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "deploy-proxy",
+			"type": "shell",
+			"command": "git add -A && git commit -m \"添加 Supabase API 代理路由，解决国内网络不可达问题\" && git push"
+		}
+	]
+}
