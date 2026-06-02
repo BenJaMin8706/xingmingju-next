@@ -738,7 +738,6 @@ export default function Home() {
                   <p className="eyebrow">Account</p>
                   <h2>我的报告</h2>
                 </div>
-                {!user && <button className="link-btn" type="button" onClick={() => setAuthOpen(true)}>登录</button>}
               </div>
               {user ? (
                 <>
@@ -760,10 +759,7 @@ export default function Home() {
                   )}
                 </>
               ) : (
-                <div className="account-empty">
-                  <p>登录后可保存你的历史报告、跨设备查看，并持续积累个人运势档案。</p>
-                  <button className="purchase-btn" type="button" onClick={() => setAuthOpen(true)}>邮箱登录</button>
-                </div>
+                <p className="section-note" style={{ lineHeight: 1.65 }}>登录后可保存你的历史报告、跨设备查看，并持续积累个人运势档案。</p>
               )}
             </div>
             <div className="wallet-card"><div><span>我的星币</span><strong>{credits}</strong></div><button type="button" onClick={() => setBuyOpen(true)}>充值</button></div>
