@@ -7,7 +7,7 @@ export type AIMessage = {
 
 const BASE_URL = process.env.AI_API_BASE_URL || "https://api.bestmax.cc";
 const API_KEY = process.env.AI_API_KEY;
-const MODEL = process.env.AI_MODEL || "deepseek-chat";
+const MODEL = process.env.AI_MODEL || "deepseek-v3";
 
 export async function callAI(messages: AIMessage[], options?: { temperature?: number; max_tokens?: number }) {
   if (!API_KEY) throw new Error("AI_API_KEY 未配置");
