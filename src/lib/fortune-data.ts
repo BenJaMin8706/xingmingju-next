@@ -247,11 +247,11 @@ function buildFallbackReportResult(input: { nickname?: string; birthTime?: strin
     title: `${nickname}的《${skill.title}》`,
     completeness: hasTime ? "高" : "中",
     confidence: hasTime ? 88 : 78,
-    overview: "已根据你填写的资料生成一份可执行的行动建议，重点结论以当前阶段最适合采取的小步动作展开。",
+    overview: "已根据你填写的资料生成行动参考，结论聚焦于当前阶段最适合采取的小步动作。",
     items: [
       "当前问题有推进空间，但更适合先观察具体反馈，再决定是否继续投入。",
-      hasTime ? "出生时间完整，命盘和时间节奏判断更稳定。" : "缺少出生时间，部分命盘细节会降权处理。",
-      "现实背景会作为主要判断依据，玄学信号只用于辅助识别趋势和节奏。",
+      hasTime ? "出生时间完整，趋势判断更稳定。" : "缺少出生时间，部分推演会降权处理。",
+      "现实背景会作为主要判断依据，传统文化概念仅用于辅助识别趋势。",
       "未来 7 天建议先做一次低成本验证，再决定是否升级行动。",
     ],
   };
@@ -283,12 +283,12 @@ export async function buildReportResult(input: { nickname?: string; birthTime?: 
     .filter(([k, v]) => typeof v === "string" && v.trim())
     .map(([k, v]) => `${k}: ${v}`)
     .join("，");
-  const prompt = `你是一位专业的玄学顾问，请围绕《${skill.title}》输出一份结构化中文建议。用户资料：${userInfo || "无"}。输出要求：\n1. 先用一句话总结当前状态。\n2. 再给出 3 到 5 条具体建议，每条单独一行。\n3. 不要使用 markdown 标题。\n4. 语言明确、克制、可执行，不要空泛安慰。`;
+  const prompt = `你是一位生活趋势分析师，擅长结合传统文化框架（如五行、星象、卦象等）为用户提供性格解读与行动参考。请围绕《${skill.title}》输出一份结构化中文建议。用户提供的参考信息：${userInfo || "无"}。输出要求：\n1. 先用一句话概括用户当前所处的阶段或状态倾向。\n2. 再给出 3 到 5 条具体观察和建议，每条单独一行。\n3. 不要使用 markdown 标题。\n4. 语言明确、克制、可执行，避免空泛安慰。\n5. 可以合理引用传统文化概念作为分析框架，但需注明为趋势参考而非确定结论。`;
 
   try {
     const aiContent = await callAI(
       [
-        { role: "system", content: "你是专业的玄学顾问，善于结合现实背景给出温和但明确的建议。" },
+        { role: "system", content: "你是一位生活趋势分析师，善于结合传统文化视角为用户提供温和但明确的性格解读与行动建议。你会坦率指出可能性与风险，但始终强调这仅为参考。" },
         { role: "user", content: prompt },
       ],
       { temperature: 0.7, max_tokens: 900 },
