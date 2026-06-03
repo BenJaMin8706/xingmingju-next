@@ -10,12 +10,15 @@ export type AIMessage = {
   content: string;
 };
 
-// 默认用 DeepSeek 直连，如果设置 AI_API_KEY 则用 BestMax
-// TODO: 将 DEEPSEEK_API_KEY 迁至 Vercel 环境变量
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "sk-aa89d0f208e84d10a68c19b6e7db7110";
-const BASE_URL = process.env.AI_API_BASE_URL || "https://api.deepseek.com";
+// 优先使用 DeepSeek 直连，如果未设置则 fallback 到 AI_API_BASE_URL
+const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
+const BASE_URL = DEEPSEEK_KEY
+  ? "https://api.deepseek.com"
+  : (process.env.AI_API_BASE_URL || "https://api.bestmax.cc");
 const API_KEY = DEEPSEEK_KEY || process.env.AI_API_KEY;
-const MODEL = process.env.AI_MODEL || "deepseek-chat";
+const MODEL = DEEPSEEK_KEY
+  ? "deepseek-chat"
+  : (process.env.AI_MODEL || "deepseek-chat");
 
 export async function callAI(messages: AIMessage[], options?: { temperature?: number; max_tokens?: number }) {
   if (!API_KEY) throw new Error("AI_API_KEY 未配置");
