@@ -283,12 +283,12 @@ export async function buildReportResult(input: { nickname?: string; birthTime?: 
     .filter(([k, v]) => typeof v === "string" && v.trim())
     .map(([k, v]) => `${k}: ${v}`)
     .join("，");
-  const prompt = `你是一位专业的玄学顾问，请围绕《${skill.title}》输出一份结构化中文建议。用户资料：${userInfo || "无"}。输出要求：\n1. 先用一句话总结当前状态。\n2. 再给出 3 到 5 条具体建议，每条单独一行。\n3. 不要使用 markdown 标题。\n4. 语言明确、克制、可执行，不要空泛安慰。`;
+  const prompt = `你是一位专业的玄学顾问，请围绕《${skill.title}》输出一份结构化中文建议。用户资料：${userInfo || "无"}。输出要求：\n1. 先用一句话总结当前状态。\n2. 再给出 3 到 5 条具体建议，每条单独一行。\n3. 不要使用 markdown 标题。\n4. 语言明确、克制、可执行，不要空泛安慰。\n5. 不要提及你的身份、模型名称或任何技术说明，直接给出玄学建议。`;
 
   try {
     const aiContent = await callAI(
       [
-        { role: "system", content: "你是专业的玄学顾问，善于结合现实背景给出温和但明确的建议。" },
+        { role: "system", content: "你是专业的玄学顾问，善于结合现实背景给出温和但明确的建议。不要提及你的模型名称、AI身份或任何技术背景，直接输出玄学建议即可。" },
         { role: "user", content: prompt },
       ],
       { temperature: 0.7, max_tokens: 900 },
