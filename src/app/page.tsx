@@ -158,6 +158,51 @@ const skills: Skill[] = [
     tag: "月运",
     fields: ["出生信息", "本月目标", "感情状态", "工作状态", "财务压力"],
   },
+  {
+    id: "baby-naming",
+    title: "宝宝起名：八字五行 + 寓意音韵",
+    teacher: "赐名阁AI",
+    category: ["naming", "bazi"],
+    desc: "根据父母姓氏、宝宝生辰八字和五行喜用神，生成大名小名各 3 个备选。",
+    image: "https://images.unsplash.com/photo-1519689680058-9e93fae72b26?auto=format&fit=crop&w=500&q=82",
+    rating: "4.9",
+    users: "3万+",
+    discount: "13%",
+    price: "35",
+    oldPrice: "40",
+    tag: "起名",
+    fields: ["父母姓氏", "宝宝性别", "宝宝出生日期", "宝宝出生时间", "出生地", "偏好风格"],
+  },
+  {
+    id: "plate-fortune",
+    title: "车牌号吉凶：数字五行 + 81数理",
+    teacher: "行车命理局",
+    category: ["number", "wealth"],
+    desc: "分析车牌数字五行组合、81数理吉凶和车主命局适配度。",
+    image: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=500&q=82",
+    rating: "4.7",
+    users: "5万+",
+    discount: "17%",
+    price: "15",
+    oldPrice: "18",
+    tag: "测号",
+    fields: ["完整车牌号", "车主出生日期", "车主出生时间", "车主出生地", "主要用车场景"],
+  },
+  {
+    id: "phone-fortune",
+    title: "手机号吉凶：八星磁场 + 数字能量",
+    teacher: "号码能量局",
+    category: ["number", "daily"],
+    desc: "分析手机号末尾数字的八星磁场、五行属性及对财运、感情、健康的影响。",
+    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=500&q=82",
+    rating: "4.8",
+    users: "8万+",
+    discount: "17%",
+    price: "15",
+    oldPrice: "18",
+    tag: "测号",
+    fields: ["手机号码", "机主出生日期", "机主性别", "机主职业", "最关心的问题"],
+  },
 ];
 
 const categories = [
@@ -169,6 +214,8 @@ const categories = [
   ["career", "事业"],
   ["daily", "每日"],
   ["compatibility", "合盘"],
+  ["naming", "起名"],
+  ["number", "测号"],
 ];
 
 const categoryLabelMap = new Map<string, string>(categories.map(([value, label]) => [value, label]));
@@ -187,6 +234,9 @@ const chatPromptCategories = [
   { id: "career", label: "事业选择", prompt: "我正在纠结工作、跳槽或 offer 选择，想判断哪个方向更适合。", keywords: ["工作", "事业", "跳槽", "offer", "老板", "岗位", "职业"] },
   { id: "match", label: "合盘长期", prompt: "我想看这段关系是否适合长期发展，双方吸引点和冲突点在哪里？", keywords: ["合盘", "婚姻", "结婚", "长期", "伴侣", "稳定"] },
   { id: "daily", label: "今日提醒", prompt: "我想先做一次今日提醒，看看现在最该注意什么。", keywords: ["今天", "现在", "日签", "提醒", "免费", "注意"] },
+  { id: "naming", label: "宝宝起名", prompt: "我想根据八字给宝宝起一个好名字，大名小名各要几个备选。", keywords: ["起名", "取名", "宝宝", "孩子", "改名", "名字"] },
+  { id: "plate", label: "车牌测吉凶", prompt: "我想看看我的车牌号码吉凶，分析数字五行组合和81数理。", keywords: ["车牌", "车号", "牌照", "车牌号"] },
+  { id: "phone", label: "手机号测吉凶", prompt: "我想测一下手机号码的吉凶，分析数字磁场和能量。", keywords: ["手机号", "电话", "号码", "手机"] },
 ] as const;
 
 type ChatPromptCategory = (typeof chatPromptCategories)[number];
@@ -469,6 +519,9 @@ export default function Home() {
     if (/合盘|婚姻|结婚|长期|伴侣/.test(text)) return skills.find((skill) => skill.id === "marriage-match") || skills[0];
     if (/免费|今天|现在|日签|提醒/.test(text)) return skills.find((skill) => skill.id === "daily-oracle") || skills[0];
     if (/正缘|对象|桃花/.test(text)) return skills.find((skill) => skill.id === "ziwei-love-map") || skills[0];
+    if (/起名|取名|名字|宝宝|孩子|小孩|改名/.test(text)) return skills.find((skill) => skill.id === "baby-naming") || skills[0];
+    if (/车牌|车号|牌照/.test(text)) return skills.find((skill) => skill.id === "plate-fortune") || skills[0];
+    if (/手机号|电话号码|号码/.test(text)) return skills.find((skill) => skill.id === "phone-fortune") || skills[0];
     return skills.find((skill) => skill.id === "reunion-tarot") || skills[0];
   }
 

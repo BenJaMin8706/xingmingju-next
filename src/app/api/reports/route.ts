@@ -16,6 +16,9 @@ const SKILL_CREDIT_COSTS: Record<string, number> = {
   "marriage-match": 25,
   "monthly-fortune": 13,
   "daily-oracle": 0, // free
+  "baby-naming": 35,
+  "plate-fortune": 15,
+  "phone-fortune": 15,
 };
 
 async function getCreditsFromAuth(userId: string): Promise<number> {
