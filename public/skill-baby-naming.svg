@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF8F0"/>
+      <stop offset="50%" stop-color="#FFF0E0"/>
+      <stop offset="100%" stop-color="#FFE4CC"/>
+    </linearGradient>
+    <linearGradient id="gold1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F0C060"/>
+      <stop offset="30%" stop-color="#D4A030"/>
+      <stop offset="70%" stop-color="#B8860B"/>
+      <stop offset="100%" stop-color="#8B6914"/>
+    </linearGradient>
+    <linearGradient id="gold2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5D080"/>
+      <stop offset="100%" stop-color="#C89820"/>
+    </linearGradient>
+    <linearGradient id="rose" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F9A8B4"/>
+      <stop offset="100%" stop-color="#E87888"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#F0C060" stop-opacity="0.25"/>
+      <stop offset="50%" stop-color="#F0C060" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#F0C060" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="400" height="320" rx="20" fill="url(#bg)"/>
+  
+  <!-- Decorative halo -->
+  <circle cx="200" cy="140" r="120" fill="url(#halo)"/>
+  
+  <!-- Outer ornate ring -->
+  <circle cx="200" cy="140" r="90" fill="none" stroke="url(#gold2)" stroke-width="2" opacity="0.35"/>
+  <circle cx="200" cy="140" r="82" fill="none" stroke="url(#gold2)" stroke-width="1" opacity="0.2" stroke-dasharray="6 4"/>
+  
+  <!-- Inner ring -->
+  <circle cx="200" cy="140" r="68" fill="none" stroke="url(#gold1)" stroke-width="1.5" opacity="0.25"/>
+  
+  <!-- Small decorative stars/diamonds -->
+  <g opacity="0.3">
+    <polygon points="200,28 204,40 216,40 206,48 210,60 200,52 190,60 194,48 184,40 196,40" fill="url(#gold2)"/>
+    <polygon points="120,100 123,108 131,108 125,114 127,122 120,117 113,122 115,114 109,108 117,108" fill="url(#gold2)"/>
+    <polygon points="280,170 283,178 291,178 285,184 287,192 280,187 273,192 275,184 269,178 277,178" fill="url(#gold2)"/>
+  </g>
+  
+  <!-- Main character "名" with gold gradient -->
+  <text x="200" y="160" text-anchor="middle" fill="url(#gold1)" font-size="72" font-family="serif" font-weight="bold" filter="drop-shadow(0px 2px 3px rgba(180,120,30,0.25))">名</text>
+  
+  <!-- Decorative accent line -->
+  <line x1="130" y1="200" x2="270" y2="200" stroke="url(#gold2)" stroke-width="1.5" opacity="0.5"/>
+  
+  <!-- Subtitle -->
+  <text x="200" y="238" text-anchor="middle" fill="#B8860B" font-size="16" font-family="sans-serif" font-weight="600" letter-spacing="6" opacity="0.85">宝宝起名</text>
+  
+  <!-- Subtitle English -->
+  <text x="200" y="262" text-anchor="middle" fill="#C89820" font-size="11" font-family="sans-serif" letter-spacing="2" opacity="0.55">BABY NAMING</text>
+  
+  <!-- Bottom decorative dots -->
+  <circle cx="180" cy="276" r="2" fill="#D4A030" opacity="0.4"/>
+  <circle cx="200" cy="280" r="3" fill="#D4A030" opacity="0.6"/>
+  <circle cx="220" cy="276" r="2" fill="#D4A030" opacity="0.4"/>
+  
+  <!-- Corner ornaments -->
+  <g opacity="0.12" stroke="url(#gold1)" stroke-width="1" fill="none">
+    <path d="M30,30 Q40,30 40,20"/>
+    <path d="M370,30 Q360,30 360,20"/>
+    <path d="M30,290 Q40,290 40,300"/>
+    <path d="M370,290 Q360,290 360,300"/>
+  </g>
+</svg>
