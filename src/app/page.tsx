@@ -164,7 +164,7 @@ const skills: Skill[] = [
     teacher: "赐名阁AI",
     category: ["naming", "bazi"],
     desc: "根据父母姓氏、宝宝生辰八字和五行喜用神，生成大名小名各 3 个备选。",
-    image: "https://images.unsplash.com/photo-1519689680058-9e93fae72b26?auto=format&fit=crop&w=500&q=82",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=82",
     rating: "4.9",
     users: "3万+",
     discount: "13%",
@@ -302,7 +302,7 @@ function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: (skill: Skill) => 
 
   return (
     <button className="skill-card" type="button" onClick={() => onOpen(skill)}>
-      <img className={`skill-image ${skill.imageMode || ""}`} src={skill.image} alt={skill.title} />
+      <img className={`skill-image ${skill.imageMode || ""}`} src={skill.image} alt={skill.title} crossOrigin="anonymous" referrerPolicy="no-referrer" loading="lazy" />
       <span className="skill-meta">
         <span className="skill-chip">{skill.tag}</span>
         <h3>{skill.title}</h3>
@@ -837,7 +837,7 @@ export default function Home() {
               <button className="close-btn" type="button" onClick={() => setSelectedSkill(null)} aria-label="关闭">×</button>
               <div className="skill-detail">
                 <div className="detail-hero">
-                  <img className={selectedSkill.imageMode || ""} src={selectedSkill.image} alt={selectedSkill.title} />
+                  <img className={selectedSkill.imageMode || ""} src={selectedSkill.image} alt={selectedSkill.title} crossOrigin="anonymous" referrerPolicy="no-referrer" />
                   <div className="detail-copy"><span className="skill-chip">{selectedSkill.tag}</span><h2 id="skillTitle">{selectedSkill.title}</h2><p>{selectedSkill.desc}</p><div className="detail-stats"><span>评分 {selectedSkill.rating}</span><span>用户 {selectedSkill.users}</span><span>{selectedSkill.teacher}</span></div><div className="purchase-panel"><div><strong>{selectedSkill.price} 星币</strong> {selectedSkill.price !== "0" && <><del>{selectedSkill.oldPrice} 星币</del></>}<p>购买前先补齐资料，AI会按报告模板生成结果。</p></div><a className="purchase-btn" href="#order-form">开始测算</a></div></div>
                 </div>
                 <form className="intake-form" id="order-form" onSubmit={submitOrder}>

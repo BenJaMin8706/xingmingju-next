@@ -126,7 +126,7 @@ h1 { max-width: 660px; margin-bottom: 18px; font-size: clamp(2.35rem, 4.2vw, 4re
   transform: translateY(-2px);
   background: #fff;
 }
-.skill-image { width: 104px; height: 126px; border-radius: 8px; object-fit: cover; background: #ddd; }
+.skill-image { width: 104px; height: 126px; border-radius: 8px; object-fit: cover; background: linear-gradient(135deg, #f0ebe3 0%, #e8dfd2 100%); }
 .skill-image.contain-image, .detail-hero img.contain-image { object-fit: contain; padding: 6px; background: #efe6d3; }
 .skill-meta { min-width: 0; }
 .skill-meta h3 { margin-bottom: 8px; font-size: 1.05rem; line-height: 1.35; }
