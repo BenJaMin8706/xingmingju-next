@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="16" fill="#f5f3ff"/>
+  <rect x="68" y="30" width="64" height="116" rx="10" fill="#7c3aed" opacity="0.15"/>
+  <rect x="72" y="36" width="56" height="104" rx="8" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
+  <circle cx="100" cy="132" r="8" stroke="#7c3aed" stroke-width="2"/>
+  <text x="100" y="82" text-anchor="middle" fill="#6d28d9" font-size="30" font-weight="900" font-family="sans-serif">📱</text>
+  <text x="100" y="175" text-anchor="middle" fill="#64748b" font-size="12" font-family="sans-serif">手机号测吉凶</text>
+</svg>

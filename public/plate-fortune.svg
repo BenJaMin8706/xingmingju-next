@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="16" fill="#f0f4ff"/>
+  <rect x="40" y="44" width="120" height="62" rx="10" fill="#3b82f6" opacity="0.2"/>
+  <rect x="50" y="52" width="100" height="46" rx="6" fill="#fff" stroke="#3b82f6" stroke-width="2"/>
+  <text x="100" y="82" text-anchor="middle" fill="#1d4ed8" font-size="22" font-weight="900" font-family="sans-serif">京A</text>
+  <text x="100" y="105" text-anchor="middle" fill="#3b82f6" font-size="28" font-weight="900" font-family="sans-serif">88888</text>
+  <text x="100" y="170" text-anchor="middle" fill="#64748b" font-size="12" font-family="sans-serif">车牌测吉凶</text>
+</svg>

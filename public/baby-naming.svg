@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="16" fill="#fef7ed"/>
+  <circle cx="100" cy="75" r="32" fill="#f8d98a" opacity="0.6"/>
+  <circle cx="100" cy="75" r="18" fill="#c89433" opacity="0.3"/>
+  <ellipse cx="100" cy="145" rx="40" ry="35" fill="#f8d98a" opacity="0.5"/>
+  <text x="100" y="82" text-anchor="middle" fill="#9d671e" font-size="28" font-family="sans-serif">宝</text>
+  <text x="100" y="165" text-anchor="middle" fill="#7d5a2e" font-size="13" font-family="sans-serif">起名</text>
+</svg>
