@@ -354,6 +354,12 @@ export default function Home() {
   const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
   const [authDirectUrl, setAuthDirectUrl] = useState("");
+  const [authTab, setAuthTab] = useState<"login" | "register">("login");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authUsername, setAuthUsername] = useState("");
+  const [authBirthDate, setAuthBirthDate] = useState("");
+  const [authBirthTime, setAuthBirthTime] = useState("");
+  const [authBirthPlace, setAuthBirthPlace] = useState("");
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [credits, setCredits] = useState(0);
@@ -550,42 +556,85 @@ export default function Home() {
     }
   }
 
-  function openSkill(skill: Skill) {
+  async function openSkill(skill: Skill) {
     setSelectedSkill(skill);
     setResult(null);
   }
 
-  async function submitMagicLink(event: FormEvent<HTMLFormElement>) {
+  // Pre-fill form data from user profile
+  const userProfile = useMemo(() => {
+    if (!user) return null;
+    const meta = (user.user_metadata || {}) as Record<string, unknown>;
+    return {
+      username: (meta.username as string) || "",
+      birthDate: (meta.birthDate as string) || "",
+      birthTime: (meta.birthTime as string) || "",
+      birthPlace: (meta.birthPlace as string) || "",
+    };
+  }, [user]);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) {
-      setAuthError("登录能力还未配置，请先补 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY。");
+      setAuthError("登录服务未配置。");
       return;
     }
-
     setAuthBusy(true);
     setAuthError("");
     setAuthMessage("");
-    setAuthDirectUrl("");
 
-    try {
-      const response = await fetch("/api/auth/send-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail.trim() }),
-      });
-      const data = await response.json();
-      if (data.error) {
-        setAuthError(data.error);
-      } else {
-        setAuthMessage("登录链接已发送，请到邮箱里点击。");
-        if (data.verifyUrl) {
-          setAuthDirectUrl(data.verifyUrl);
-        }
-      }
-    } catch {
-      setAuthError("网络错误，请稍后重试");
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail.trim(),
+      password: authPassword,
+    });
+
+    if (error) {
+      setAuthError(error.message === "Invalid login credentials"
+        ? "邮箱或密码错误，请重试"
+        : error.message);
+    } else {
+      setAuthOpen(false);
+      setAuthPassword("");
+      setToast("👋 登录成功");
     }
+    setAuthBusy(false);
+  }
 
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) {
+      setAuthError("注册服务未配置。");
+      return;
+    }
+    if (authPassword.length < 6) {
+      setAuthError("密码至少需要6位");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError("");
+    setAuthMessage("");
+
+    const { error } = await supabase.auth.signUp({
+      email: authEmail.trim(),
+      password: authPassword,
+      options: {
+        data: {
+          username: authUsername.trim(),
+          birthDate: authBirthDate,
+          birthTime: authBirthTime,
+          birthPlace: authBirthPlace.trim(),
+        },
+      },
+    });
+
+    if (error) {
+      setAuthError(error.message === "User already registered"
+        ? "该邮箱已注册，请直接登录"
+        : error.message);
+    } else {
+      setAuthMessage("注册成功！验证邮件已发送，请检查邮箱并点击验证链接。");
+      setAuthPassword("");
+    }
     setAuthBusy(false);
   }
 
@@ -595,6 +644,7 @@ export default function Home() {
     setAuthOpen(false);
     setAuthMessage("");
     setAuthError("");
+    setAuthPassword("");
   }
 
   async function handleBuyCredits(packageId: string) {
@@ -698,6 +748,7 @@ export default function Home() {
           <div className="header-actions">
             {user ? (
               <>
+                <span className="user-badge">{userProfile?.username || user.email?.split("@")[0] || "用户"}</span>
                 <button className="ghost-btn" type="button" onClick={() => scrollToSection("account-section")}>我的报告</button>
                 <button className="secondary-btn" type="button" onClick={handleLogout}>退出</button>
               </>
@@ -794,7 +845,17 @@ export default function Home() {
               </div>
               {user ? (
                 <>
-                  <p className="section-note">当前账号：{user.email || user.phone || user.id.slice(0, 8)}</p>
+                  <div className="profile-info">
+                    <p className="section-note">
+                      {userProfile?.username ? <><strong>{userProfile.username}</strong> · </> : null}
+                      {user.email}
+                    </p>
+                    {(userProfile?.birthDate) ? (
+                      <p className="section-note" style={{ fontSize: "0.84rem" }}>
+                        📅 {userProfile.birthDate}{userProfile.birthTime ? ` · ${userProfile.birthTime}` : ""}{userProfile.birthPlace ? ` · ${userProfile.birthPlace}` : ""}
+                      </p>
+                    ) : null}
+                  </div>
                   {reportsLoading ? (
                     <p className="section-note">正在加载历史报告...</p>
                   ) : savedReports.length ? (
@@ -843,10 +904,10 @@ export default function Home() {
                 <form className="intake-form" id="order-form" onSubmit={submitOrder}>
                   <h3>报告资料采集</h3>
                   <div className="intake-grid">
-                    <label>昵称<input name="nickname" placeholder="可选，例如：阿星" /></label>
-                    <label>出生日期<input name="birthDate" type="date" required /></label>
-                    <label>出生时间<input name="birthTime" type="time" required /></label>
-                    <label>出生地<input name="birthPlace" placeholder="例如：杭州" required /></label>
+                    <label>昵称<input name="nickname" defaultValue={userProfile?.username || ""} placeholder="可选，例如：阿星" /></label>
+                    <label>出生日期<input name="birthDate" type="date" defaultValue={userProfile?.birthDate || ""} required /></label>
+                    <label>出生时间<input name="birthTime" type="time" defaultValue={userProfile?.birthTime || ""} required /></label>
+                    <label>出生地<input name="birthPlace" defaultValue={userProfile?.birthPlace || ""} placeholder="例如：杭州" required /></label>
                     {selectedSkill.fields.map((field, index) => <label key={field}>{field}<input name={`field${index}`} placeholder={`可选，${field}`} /></label>)}
                   </div>
                   <label>补充背景<textarea name="context" placeholder="可选，把最近发生的事、你最担心的问题写清楚" /></label>
@@ -910,31 +971,52 @@ export default function Home() {
       )}
 
       {authOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-            <div className="dialog-shell small-dialog">
-              <button className="close-btn" type="button" onClick={() => setAuthOpen(false)} aria-label="关闭">×</button>
-              <p className="eyebrow">Auth</p>
-              <h2 id="authTitle">登录 / 注册</h2>
-              <p className="section-note">当前采用邮箱魔法链接登录。输入邮箱后，去收件箱点击登录链接即可回到本站完成登录。</p>
-              <form className="auth-form" onSubmit={submitMagicLink}>
-                <label>
-                  邮箱
-                  <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="例如：you@example.com" required />
-                </label>
-                <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "发送中..." : "发送登录链接"}</button>
-              </form>
+        <div className="modal-backdrop" role="presentation" onClick={() => setAuthOpen(false)}>
+          <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-shell auth-dialog">
+              <button className="close-btn" type="button" onClick={() => { setAuthOpen(false); setAuthError(""); setAuthMessage(""); }} aria-label="关闭">×</button>
+
+              {/* Tab switcher */}
+              <div className="auth-tabs">
+                <button className={authTab === "login" ? "active" : ""} type="button" onClick={() => { setAuthTab("login"); setAuthError(""); setAuthMessage(""); }}>
+                  登录
+                </button>
+                <button className={authTab === "register" ? "active" : ""} type="button" onClick={() => { setAuthTab("register"); setAuthError(""); setAuthMessage(""); }}>
+                  注册
+                </button>
+              </div>
+
+              {authTab === "login" ? (
+                <>
+                  <h2 id="authTitle">欢迎回来</h2>
+                  <p className="section-note">使用邮箱和密码登录你的星命局账号</p>
+                  <form className="auth-form" onSubmit={handleLogin}>
+                    <label>邮箱<input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" required /></label>
+                    <label>密码<input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="输入密码" required /></label>
+                    <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "登录中..." : "登录"}</button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <h2 id="authTitle">创建账号</h2>
+                  <p className="section-note">注册后你的报告和星币会绑定到账号，后续登录即可查看</p>
+                  <form className="auth-form" onSubmit={handleRegister}>
+                    <label>邮箱<input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" required /></label>
+                    <label>密码<input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="至少6位密码" required minLength={6} /></label>
+                    <label>昵称<input type="text" value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} placeholder="给自己起个名字，如：阿星" /></label>
+                    <div className="auth-row">
+                      <label>出生日期<input type="date" value={authBirthDate} onChange={(e) => setAuthBirthDate(e.target.value)} /></label>
+                      <label>出生时间<input type="time" value={authBirthTime} onChange={(e) => setAuthBirthTime(e.target.value)} /></label>
+                    </div>
+                    <label>出生地<input type="text" value={authBirthPlace} onChange={(e) => setAuthBirthPlace(e.target.value)} placeholder="例如：杭州" /></label>
+                    <p className="helper-text" style={{ fontSize: 12, marginBottom: 4 }}>这些信息会在你购买技能时自动填入，省去重复填写</p>
+                    <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "注册中..." : "注册"}</button>
+                  </form>
+                </>
+              )}
+
               {authMessage ? <p className="helper-text success-text">{authMessage}</p> : null}
               {authError ? <p className="helper-text error-text">{authError}</p> : null}
-              {authDirectUrl ? (
-                <p className="helper-text" style={{ wordBreak: "break-all", marginTop: 8 }}>
-                  👉 也可以直接点此链接登录：
-                  <br />
-                  <a href={authDirectUrl} style={{ color: "#7c3aed", textDecoration: "underline" }}>
-                    {authDirectUrl}
-                  </a>
-                </p>
-              ) : null}
             </div>
           </section>
         </div>
