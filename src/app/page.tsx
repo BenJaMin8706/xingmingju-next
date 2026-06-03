@@ -740,7 +740,9 @@ export default function Home() {
       )}
       <header className="app-header">
         <div className="header-inner">
-          <a className="brand" href="#top" aria-label="星命局首页"><span className="brand-mark">局</span><span>星命局</span></a>
+          <a className="brand" href="#top" aria-label="星命局首页">
+            <img src="/logo.svg" alt="星命局 · AI运势技能商店" className="brand-logo" />
+          </a>
           <label className="search-box"><span className="search-label">搜索<span className="search-divider" aria-hidden="true">|</span></span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="复合、财运、塔罗、八字" /></label>
           <nav className="main-tabs" aria-label="主导航">
             {navItems.map((label) => <button className={activeNav === label ? "active" : ""} key={label} type="button" onClick={() => handleNavClick(label)} aria-current={activeNav === label ? "page" : undefined}>{label}</button>)}
