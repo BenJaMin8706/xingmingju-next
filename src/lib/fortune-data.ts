@@ -160,7 +160,7 @@ export const skills: Skill[] = [
     teacher: "赐名阁AI",
     category: ["naming", "bazi"],
     desc: "根据父母姓氏、宝宝生辰八字和五行喜用神，生成大名小名各 3 个备选。",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=82",
+    image: "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?auto=format&fit=crop&w=500&q=82",
     rating: "4.9",
     users: "3万+",
     discount: "13%",
