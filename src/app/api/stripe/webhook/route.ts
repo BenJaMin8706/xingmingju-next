@@ -72,24 +72,9 @@ export async function POST(request: NextRequest) {
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.warn("STRIPE_WEBHOOK_SECRET not set, accepting unverified webhook (insecure)");
-    // Fall back to basic parsing without signature verification
-    try {
-      const body = await request.json();
-      if (body.type === "checkout.session.completed") {
-        const session = body.data?.object;
-        const userId = session?.metadata?.userId || session?.client_reference_id;
-        const packageId = session?.metadata?.packageId;
-        const credits = CREDIT_MAP[packageId] || parseInt(session?.metadata?.credits || "0", 10);
-
-        if (userId && credits > 0) {
-          await addCreditsToUser(userId, credits);
-        }
-      }
-      return NextResponse.json({ received: true });
-    } catch {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-    }
+    // Refuse to process unverified webhooks — forged events could grant free credits.
+    console.error("STRIPE_WEBHOOK_SECRET not set, rejecting webhook");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
 
   // Verified webhook path

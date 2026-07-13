@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://ycefjltmcjkwavlihcsu.supabase.co";
-
-const SR_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZWZqbHRtY2prd2F2bGloY3N1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQ1MDM4NiwiZXhwIjoyMDk1MDI2Mzg2fQ.ChSmfvM5jvNpceOkYWiTnMnqmRJfQpdImKv2qg2vPqE";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const SR_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!SUPABASE_URL || !SR_KEY) {
+      return NextResponse.json({ error: "服务未配置" }, { status: 500 });
+    }
+
     const { email } = await request.json();
     if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
 
@@ -52,6 +50,7 @@ export async function POST(request: NextRequest) {
       verifyUrl,
     });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error("[send-link] error:", err);
+    return NextResponse.json({ error: "服务器错误" }, { status: 500 });
   }
 }

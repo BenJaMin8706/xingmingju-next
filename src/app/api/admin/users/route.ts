@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -8,13 +9,21 @@ export const runtime = "nodejs";
  * Protected by ADMIN_API_KEY env var (same as grant endpoint).
  */
 
-const FALLBACK_KEY = "BKhyYzOu1DjgWuPIWyeGm/GPy/XC4fliXXInw1gYnoE";
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 export async function GET(request: NextRequest) {
   const adminKey = request.headers.get("x-admin-key") || "";
-  const expectedKey = process.env.ADMIN_API_KEY || FALLBACK_KEY;
+  const expectedKey = process.env.ADMIN_API_KEY;
 
-  if (adminKey !== expectedKey) {
+  if (!expectedKey) {
+    return NextResponse.json({ error: "服务未配置" }, { status: 503 });
+  }
+  if (!timingSafeEqualStr(adminKey, expectedKey)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

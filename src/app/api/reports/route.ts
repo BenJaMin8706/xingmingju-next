@@ -77,10 +77,16 @@ export async function POST(request: NextRequest) {
   const userId = (await getUserIdFromRequest(request)) || "anonymous";
   const creditCost = SKILL_CREDIT_COSTS[skill.id] || 0;
 
-  // Check credits for paid skills
+  // Paid skills require login and sufficient balance. Deduct BEFORE generating
+  // the report so we never spend AI tokens on an unpaid request, and to keep the
+  // check-and-deduct window as small as possible.
   if (creditCost > 0) {
-    const balance = await getCreditsFromAuth(userId);
-    if (balance < creditCost) {
+    if (userId === "anonymous") {
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    }
+    const remaining = await deductCreditsFromAuth(userId, creditCost);
+    if (remaining < 0) {
+      const balance = await getCreditsFromAuth(userId);
       return NextResponse.json({
         error: "星币不足",
         needed: creditCost,
@@ -98,11 +104,6 @@ export async function POST(request: NextRequest) {
     },
     skill,
   );
-
-  // Deduct credits
-  if (creditCost > 0) {
-    await deductCreditsFromAuth(userId, creditCost);
-  }
 
   const record = await appendReport({ skillId: skill.id, userId, payload, result });
   return NextResponse.json({ reportId: record.id, result });

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
+
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 /**
  * Admin API: Grant credits to any user by email.
@@ -15,11 +23,12 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const adminKey = request.headers.get("x-admin-key") || "";
-  // TODO: move this to Vercel env var ADMIN_API_KEY for production
-  const FALLBACK_KEY = "BKhyYzOu1DjgWuPIWyeGm/GPy/XC4fliXXInw1gYnoE";
-  const expectedKey = process.env.ADMIN_API_KEY || FALLBACK_KEY;
+  const expectedKey = process.env.ADMIN_API_KEY;
 
-  if (adminKey !== expectedKey) {
+  if (!expectedKey) {
+    return NextResponse.json({ error: "服务未配置" }, { status: 503 });
+  }
+  if (!timingSafeEqualStr(adminKey, expectedKey)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

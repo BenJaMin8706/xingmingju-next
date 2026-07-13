@@ -402,22 +402,15 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
     if (paymentStatus === "success") {
-      const addedCredits = parseInt(params.get("credits") || "0", 10);
-      if (addedCredits > 0) {
-        // Try to add credits server-side regardless of login state
+      // Credits are added server-side by the verified Stripe webhook — never trust
+      // the client to add them. Just refresh the balance from the server.
+      setToast("🎉 支付成功！星币将在到账后自动更新");
+      if (session?.access_token) {
         fetch("/api/user/credits", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ addCredits: addedCredits }),
+          headers: { Authorization: `Bearer ${session.access_token}` },
         })
           .then((r) => r.json())
-          .then((d: { credits?: number }) => {
-            setCredits(d.credits || 0);
-            setToast(`🎉 支付成功！+${addedCredits} 星币已到账`);
-          })
+          .then((d: { credits?: number }) => setCredits(d.credits || 0))
           .catch(() => {});
       }
       window.history.replaceState({}, "", "/");
@@ -469,23 +462,22 @@ export default function Home() {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((r) => r.json())
-      .then((d: { credits?: number; isNew?: boolean }) => {
+      .then((d: { credits?: number; welcomeGranted?: boolean }) => {
         setCredits(d.credits || 0);
-        // New user: grant welcome credits on first login
-        if (d.isNew || (d.credits === 0 && !localStorage.getItem("xingmingju-welcome-granted"))) {
+        // New user: claim one-time welcome bonus (amount decided & guarded server-side)
+        if (!d.welcomeGranted) {
           fetch("/api/user/credits", {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
               Authorization: `Bearer ${session.access_token}`,
             },
-            body: JSON.stringify({ addCredits: 10 }),
           })
             .then((r2) => r2.json())
-            .then((d2: { credits?: number }) => {
+            .then((d2: { credits?: number; added?: number }) => {
               setCredits(d2.credits || 0);
-              setToast("🎁 首次登录赠送 10 星币体验金");
-              localStorage.setItem("xingmingju-welcome-granted", "1");
+              if (d2.added && d2.added > 0) {
+                setToast(`🎁 首次登录赠送 ${d2.added} 星币体验金`);
+              }
             })
             .catch(() => {});
         }
@@ -660,17 +652,9 @@ export default function Home() {
       });
       const data = await resp.json();
       if (data.demo) {
-        // Demo mode: directly add credits
-        await fetch("/api/user/credits", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token || ""}`,
-          },
-          body: JSON.stringify({ addCredits: data.message?.match(/\d+/)?.[0] || 100 }),
-        });
-        setCredits((c) => c + 100);
-        alert("演示模式：已充值 100 星币！");
+        // Payment is not configured on the server. We must NOT grant spendable
+        // credits from the client — that would let anyone top up for free.
+        alert("支付功能尚未开通，请稍后再试或联系客服");
       } else if (data.url) {
         window.location.href = data.url;
       } else {
