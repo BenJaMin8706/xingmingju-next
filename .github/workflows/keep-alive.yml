@@ -1,0 +1,24 @@
+name: Keep Supabase Alive
+
+# Ping the website every 2 days to prevent Supabase free-tier auto-pause.
+# Free-tier projects pause after 7 days of inactivity.
+# This runs a real browser-like request that hits the Supabase backend.
+
+on:
+  schedule:
+    # Runs at 08:00 UTC every 2 days
+    - cron: "0 8 */2 * *"
+  # Also allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping website
+        run: |
+          echo "=== $(date -u) ==="
+          HTTP_CODE=$(curl -s -o /tmp/ping.html -w "%{http_code}" https://xingmingju-next.vercel.app/)
+          echo "Homepage: HTTP $HTTP_CODE"
+          curl -s -o /dev/null -w "Supabase Auth: HTTP %{http_code}\n" https://ycefjltmcjkwavlihcsu.supabase.co/auth/v1/settings || true
+          echo "Ping complete."
