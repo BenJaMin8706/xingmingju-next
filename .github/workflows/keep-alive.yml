@@ -1,24 +1,50 @@
 name: Keep Supabase Alive
 
-# Ping the website every 2 days to prevent Supabase free-tier auto-pause.
-# Free-tier projects pause after 7 days of inactivity.
-# This runs a real browser-like request that hits the Supabase backend.
+# Ping Supabase every day to prevent free-tier auto-pause (pauses after 7 days
+# of inactivity). Uses the PUBLIC anon key to make a real database request,
+# which reliably counts as project activity. Fails loudly if Supabase is down
+# so GitHub sends a workflow failure notification.
 
 on:
   schedule:
-    # Runs at 08:00 UTC every 2 days
-    - cron: "0 8 */2 * *"
-  # Also allow manual trigger from GitHub Actions tab
+    # Runs at 08:00 UTC every day
+    - cron: "0 8 * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping website
+      - name: Ping website and Supabase
         run: |
+          set -e
           echo "=== $(date -u) ==="
-          HTTP_CODE=$(curl -s -o /tmp/ping.html -w "%{http_code}" https://xingmingju-next.vercel.app/)
-          echo "Homepage: HTTP $HTTP_CODE"
-          curl -s -o /dev/null -w "Supabase Auth: HTTP %{http_code}\n" https://ycefjltmcjkwavlihcsu.supabase.co/auth/v1/settings || true
-          echo "Ping complete."
+
+          # 1. Frontend must be up
+          HOME_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://xingmingju-next.vercel.app/)
+          echo "Homepage: HTTP $HOME_CODE"
+
+          # 2. Auth service must be up
+          AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://ycefjltmcjkwavlihcsu.supabase.co/auth/v1/settings)
+          echo "Auth: HTTP $AUTH_CODE"
+          # 401 means the auth service responded (it requires an apikey header)
+          if [ "$AUTH_CODE" != "401" ] && [ "$AUTH_CODE" != "200" ]; then
+            echo "ERROR: Supabase auth service unreachable (HTTP $AUTH_CODE)"
+            exit 1
+          fi
+
+          # 3. Real Postgres query via PostgREST using the PUBLIC anon key.
+          #    A 401 is expected (no SELECT grant for anon) but proves Postgres
+          #    is serving queries — which is what counts as activity.
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZWZqbHRtY2prd2F2bGloY3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NTAzODYsImV4cCI6MjA5NTAyNjM4Nn0.wP1_aecc6oNctjraPAprenr47SrglLWeemX3yXS-fd4"
+          REST_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 \
+            -H "apikey: $ANON_KEY" \
+            "https://ycefjltmcjkwavlihcsu.supabase.co/rest/v1/question_stats?limit=1")
+          echo "PostgREST: HTTP $REST_CODE"
+          if [ "$REST_CODE" = "000" ] || [ "$REST_CODE" = "521" ] || [ "$REST_CODE" = "502" ] || [ "$REST_CODE" = "503" ]; then
+            echo "ERROR: Supabase database is down (HTTP $REST_CODE)"
+            exit 1
+          fi
+
+          echo "All checks passed."
+
