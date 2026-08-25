@@ -354,12 +354,7 @@ export default function Home() {
   const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
   const [authDirectUrl, setAuthDirectUrl] = useState("");
-  const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [authPassword, setAuthPassword] = useState("");
-  const [authUsername, setAuthUsername] = useState("");
-  const [authBirthDate, setAuthBirthDate] = useState("");
-  const [authBirthTime, setAuthBirthTime] = useState("");
-  const [authBirthPlace, setAuthBirthPlace] = useState("");
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [credits, setCredits] = useState(0);
@@ -592,44 +587,6 @@ export default function Home() {
     setAuthBusy(false);
   }
 
-  async function handleRegister(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!supabase) {
-      setAuthError("注册服务未配置。");
-      return;
-    }
-    if (authPassword.length < 6) {
-      setAuthError("密码至少需要6位");
-      return;
-    }
-    setAuthBusy(true);
-    setAuthError("");
-    setAuthMessage("");
-
-    const { error } = await supabase.auth.signUp({
-      email: authEmail.trim(),
-      password: authPassword,
-      options: {
-        data: {
-          username: authUsername.trim(),
-          birthDate: authBirthDate,
-          birthTime: authBirthTime,
-          birthPlace: authBirthPlace.trim(),
-        },
-      },
-    });
-
-    if (error) {
-      setAuthError(error.message === "User already registered"
-        ? "该邮箱已注册，请直接登录"
-        : error.message);
-    } else {
-      setAuthMessage("注册成功！验证邮件已发送，请检查邮箱并点击验证链接。");
-      setAuthPassword("");
-    }
-    setAuthBusy(false);
-  }
-
   async function handleLogout() {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -695,6 +652,12 @@ export default function Home() {
         return;
       }
 
+      if (response.status === 403) {
+        const errData = await response.json() as { error?: string };
+        alert(errData.error || "该功能仅限站长使用");
+        return;
+      }
+
       if (response.status === 429) {
         const errData = await response.json() as { error?: string };
         alert(errData.error || "操作太频繁，请稍后再试");
@@ -751,7 +714,7 @@ export default function Home() {
                 <button className="secondary-btn" type="button" onClick={handleLogout}>退出</button>
               </>
             ) : (
-              <button className="secondary-btn" type="button" onClick={() => setAuthOpen(true)}>登录 / 注册</button>
+              <button className="secondary-btn" type="button" onClick={() => setAuthOpen(true)}>登录</button>
             )}
           </div>
         </div>
@@ -974,44 +937,13 @@ export default function Home() {
             <div className="dialog-shell auth-dialog">
               <button className="close-btn" type="button" onClick={() => { setAuthOpen(false); setAuthError(""); setAuthMessage(""); }} aria-label="关闭">×</button>
 
-              {/* Tab switcher */}
-              <div className="auth-tabs">
-                <button className={authTab === "login" ? "active" : ""} type="button" onClick={() => { setAuthTab("login"); setAuthError(""); setAuthMessage(""); }}>
-                  登录
-                </button>
-                <button className={authTab === "register" ? "active" : ""} type="button" onClick={() => { setAuthTab("register"); setAuthError(""); setAuthMessage(""); }}>
-                  注册
-                </button>
-              </div>
-
-              {authTab === "login" ? (
-                <>
-                  <h2 id="authTitle">欢迎回来</h2>
-                  <p className="section-note">使用邮箱和密码登录你的星命局账号</p>
-                  <form className="auth-form" onSubmit={handleLogin}>
-                    <label>邮箱<input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" required /></label>
-                    <label>密码<input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="输入密码" required /></label>
-                    <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "登录中..." : "登录"}</button>
-                  </form>
-                </>
-              ) : (
-                <>
-                  <h2 id="authTitle">创建账号</h2>
-                  <p className="section-note">注册后你的报告和星币会绑定到账号，后续登录即可查看</p>
-                  <form className="auth-form" onSubmit={handleRegister}>
-                    <label>邮箱<input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" required /></label>
-                    <label>密码<input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="至少6位密码" required minLength={6} /></label>
-                    <label>昵称<input type="text" value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} placeholder="给自己起个名字，如：阿星" /></label>
-                    <div className="auth-row">
-                      <label>出生日期<input type="date" value={authBirthDate} onChange={(e) => setAuthBirthDate(e.target.value)} /></label>
-                      <label>出生时间<input type="time" value={authBirthTime} onChange={(e) => setAuthBirthTime(e.target.value)} /></label>
-                    </div>
-                    <label>出生地<input type="text" value={authBirthPlace} onChange={(e) => setAuthBirthPlace(e.target.value)} placeholder="例如：杭州" /></label>
-                    <p className="helper-text" style={{ fontSize: 12, marginBottom: 4 }}>这些信息会在你购买技能时自动填入，省去重复填写</p>
-                    <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "注册中..." : "注册"}</button>
-                  </form>
-                </>
-              )}
+              <h2 id="authTitle">登录</h2>
+              <p className="section-note">使用邮箱和密码登录你的星命局账号</p>
+              <form className="auth-form" onSubmit={handleLogin}>
+                <label>邮箱<input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@example.com" required /></label>
+                <label>密码<input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="输入密码" required /></label>
+                <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "登录中..." : "登录"}</button>
+              </form>
 
               {authMessage ? <p className="helper-text success-text">{authMessage}</p> : null}
               {authError ? <p className="helper-text error-text">{authError}</p> : null}

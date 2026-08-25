@@ -26,6 +26,25 @@ const FREE_DAILY_LIMIT = 3; // free skill uses per user per day
 const MAX_FIELD_LENGTH = 300; // per payload field (prevents input-token abuse)
 const MAX_FIELDS = 10;
 
+// Site-owner-only mode: only these emails may generate reports.
+// Set ALLOWED_USER_EMAILS (comma-separated) in Vercel env to override.
+const ALLOWED_EMAILS = (process.env.ALLOWED_USER_EMAILS || "benjamin.pan@foxmail.com")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+async function isAllowedUser(userId: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  try {
+    const { data } = await supabase.auth.admin.getUserById(userId);
+    const email = (data?.user?.email || "").toLowerCase();
+    return Boolean(email) && ALLOWED_EMAILS.includes(email);
+  } catch {
+    return false;
+  }
+}
+
 function sanitizePayload(payload: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(payload)) {
@@ -120,6 +139,11 @@ export async function POST(request: NextRequest) {
   const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
+
+  // Site-owner-only mode: only allowlisted users may generate reports.
+  if (!(await isAllowedUser(userId))) {
+    return NextResponse.json({ error: "该功能仅限站长使用" }, { status: 403 });
   }
 
   const creditCost = SKILL_CREDIT_COSTS[skill.id] || 0;
