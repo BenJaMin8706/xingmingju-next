@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
+import type { Session } from "@supabase/supabase-js";
 
 type AdminUser = {
   id: string;
@@ -19,8 +21,12 @@ type UsersResponse = {
 };
 
 export default function AdminPage() {
-  const [key, setKey] = useState("");
-  const [authenticated, setAuthenticated] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<UsersResponse | null>(null);
   const [error, setError] = useState("");
@@ -28,30 +34,70 @@ export default function AdminPage() {
   const [grantAmount, setGrantAmount] = useState(100);
   const [grantMsg, setGrantMsg] = useState("");
 
-  // Restore key from sessionStorage
+  const authenticated = Boolean(session);
+
+  // Restore existing session (site owner logged in via Supabase)
   useEffect(() => {
-    const saved = sessionStorage.getItem("admin-key");
-    if (saved) {
-      setKey(saved);
-      setAuthenticated(true);
+    const supabase = getBrowserSupabase();
+    if (!supabase) {
+      setChecking(false);
+      return;
     }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      setChecking(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
+
+  function authHeaders(): Record<string, string> {
+    return session?.access_token
+      ? { Authorization: `Bearer ${session.access_token}` }
+      : {};
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    const supabase = getBrowserSupabase();
+    if (!supabase) {
+      setAuthError("登录服务未配置。");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError("");
+    const { data: result, error: loginError } = await supabase.auth.signInWithPassword({
+      email: authEmail.trim(),
+      password: authPassword,
+    });
+    if (loginError) {
+      setAuthError(loginError.message === "Invalid login credentials" ? "邮箱或密码错误" : loginError.message);
+    } else {
+      setSession(result.session ?? null);
+      setAuthPassword("");
+    }
+    setAuthBusy(false);
+  }
+
+  async function handleLogout() {
+    await getBrowserSupabase()?.auth.signOut();
+    setSession(null);
+    setData(null);
+  }
 
   async function fetchUsers() {
     setLoading(true);
     setError("");
     try {
-      const resp = await fetch("/api/admin/users", {
-        headers: { "x-admin-key": key },
-      });
+      const resp = await fetch("/api/admin/users", { headers: authHeaders() });
       const json = await resp.json();
       if (resp.ok) {
         setData(json);
-        sessionStorage.setItem("admin-key", key);
-        setAuthenticated(true);
       } else {
         setError(json.error || "请求失败");
-        setAuthenticated(false);
+        if (resp.status === 401) setSession(null);
       }
     } catch {
       setError("网络错误");
@@ -67,7 +113,7 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": key,
+          ...authHeaders(),
         },
         body: JSON.stringify({ email: grantEmail.trim(), credits: grantAmount }),
       });
@@ -77,7 +123,8 @@ export default function AdminPage() {
         setGrantEmail("");
         fetchUsers(); // refresh list
       } else {
-        setGrantMsg(`❌ ${json.error}`);
+        setGrantMsg(`❌ ${json.error || "操作失败"}`);
+        if (resp.status === 401) setSession(null);
       }
     } catch {
       setGrantMsg("❌ 网络错误");
@@ -85,8 +132,9 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (authenticated && key) fetchUsers();
-  }, [authenticated, key]);
+    if (authenticated) fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated]);
 
   function formatDate(d: string) {
     if (!d) return "-";
@@ -98,27 +146,49 @@ export default function AdminPage() {
       <h1 style={{ margin: "0 0 8px" }}>🛡️ 星命局 · 管理后台</h1>
       <p style={{ color: "#6b7280", margin: "0 0 24px" }}>用户列表 · 星币管理</p>
 
-      {!authenticated ? (
+      {checking ? (
+        <p style={{ color: "#6b7280" }}>加载中...</p>
+      ) : !authenticated ? (
         <div style={{ maxWidth: 420, padding: 24, border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb" }}>
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>管理员密钥</label>
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="输入 ADMIN_API_KEY"
-            style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 14, boxSizing: "border-box" }}
-          />
-          <button
-            onClick={fetchUsers}
-            disabled={!key}
-            style={{ width: "100%", marginTop: 12, padding: "10px 0", border: "none", borderRadius: 6, background: key ? "#171512" : "#d1d5db", color: "#fff", fontWeight: 700, cursor: key ? "pointer" : "default" }}
-          >
-            验证并进入
-          </button>
-          {error && <p style={{ color: "#dc2626", marginTop: 12, fontSize: 14 }}>{error}</p>}
+          <h2 style={{ fontSize: 18, margin: "0 0 4px" }}>站长登录</h2>
+          <p style={{ color: "#6b7280", fontSize: 13, margin: "0 0 16px" }}>使用你的星命局账号登录后进入后台</p>
+          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input
+              type="email"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              placeholder="站长邮箱"
+              required
+              style={{ padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 14, boxSizing: "border-box" }}
+            />
+            <input
+              type="password"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              placeholder="密码"
+              required
+              style={{ padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 14, boxSizing: "border-box" }}
+            />
+            <button
+              type="submit"
+              disabled={authBusy || !authEmail || !authPassword}
+              style={{ padding: "10px 0", border: "none", borderRadius: 6, background: "#171512", color: "#fff", fontWeight: 700, cursor: "pointer" }}
+            >
+              {authBusy ? "登录中..." : "登录"}
+            </button>
+          </form>
+          {authError && <p style={{ color: "#dc2626", marginTop: 12, fontSize: 14 }}>{authError}</p>}
         </div>
       ) : (
         <>
+          {/* Header bar with logout */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ color: "#374151", fontSize: 14 }}>
+              已登录：<strong>{session?.user?.email || ""}</strong>
+            </span>
+            <button onClick={handleLogout} style={{ padding: "6px 14px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 13 }}>退出登录</button>
+          </div>
+
           {/* Grant credits section */}
           <form onSubmit={handleGrant} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 24, padding: 16, border: "1px solid #fbbf24", borderRadius: 8, background: "#fffbeb", flexWrap: "wrap" }}>
             <label style={{ flex: "1 1 180px", minWidth: 160 }}>

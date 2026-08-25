@@ -1,34 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { isAdminRequest } from "@/lib/admin-auth";
 import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
-}
-
 /**
  * Admin API: Grant credits to any user by email.
- * Protected by ADMIN_API_KEY env var.
+ * Authorized via site-owner session (allowlisted email) or ADMIN_API_KEY header.
  *
  * Usage:
  * POST /api/admin/grant
- * Headers: x-admin-key: <ADMIN_API_KEY>
+ * Headers: Authorization: Bearer <supabase access token>  (or x-admin-key: <ADMIN_API_KEY>)
  * Body: { "email": "friend@example.com", "credits": 50 }
  */
 
 export async function POST(request: NextRequest) {
-  const adminKey = request.headers.get("x-admin-key") || "";
-  const expectedKey = process.env.ADMIN_API_KEY;
-
-  if (!expectedKey) {
-    return NextResponse.json({ error: "服务未配置" }, { status: 503 });
-  }
-  if (!timingSafeEqualStr(adminKey, expectedKey)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

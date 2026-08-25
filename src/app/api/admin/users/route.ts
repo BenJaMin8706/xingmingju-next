@@ -1,29 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { isAdminRequest } from "@/lib/admin-auth";
 import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
 /**
  * Admin API: List all users with credit balances.
- * Protected by ADMIN_API_KEY env var (same as grant endpoint).
+ * Authorized via site-owner session (allowlisted email) or ADMIN_API_KEY header.
  */
 
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
-}
-
 export async function GET(request: NextRequest) {
-  const adminKey = request.headers.get("x-admin-key") || "";
-  const expectedKey = process.env.ADMIN_API_KEY;
-
-  if (!expectedKey) {
-    return NextResponse.json({ error: "服务未配置" }, { status: 503 });
-  }
-  if (!timingSafeEqualStr(adminKey, expectedKey)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isEmailAllowed } from "@/lib/allowlist";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SR_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -12,11 +11,6 @@ export async function POST(request: NextRequest) {
 
     const { email } = await request.json();
     if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
-
-    // Registration is closed: only allowlisted emails may receive login links.
-    if (!isEmailAllowed(String(email))) {
-      return NextResponse.json({ error: "注册已关闭" }, { status: 403 });
-    }
 
     // 1. Send OTP (magic link email)
     const otpRes = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
