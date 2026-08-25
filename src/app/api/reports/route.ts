@@ -15,11 +15,28 @@ const SKILL_CREDIT_COSTS: Record<string, number> = {
   "western-chart": 17,
   "marriage-match": 25,
   "monthly-fortune": 13,
-  "daily-oracle": 0, // free
+  "daily-oracle": 0, // free but requires login + daily limit
   "baby-naming": 35,
   "plate-fortune": 15,
   "phone-fortune": 15,
 };
+
+// Anti-abuse limits: every AI call costs tokens, so we must throttle.
+const FREE_DAILY_LIMIT = 3; // free skill uses per user per day
+const MAX_FIELD_LENGTH = 300; // per payload field (prevents input-token abuse)
+const MAX_FIELDS = 10;
+
+function sanitizePayload(payload: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (typeof value === "string") {
+      const trimmed = value.trim().slice(0, MAX_FIELD_LENGTH);
+      if (trimmed) out[key.slice(0, 50)] = trimmed;
+    }
+    if (Object.keys(out).length >= MAX_FIELDS) break;
+  }
+  return out;
+}
 
 async function getCreditsFromAuth(userId: string): Promise<number> {
   if (!userId || userId === "anonymous") return 0;
@@ -51,6 +68,28 @@ async function deductCreditsFromAuth(userId: string, amount: number): Promise<nu
   }
 }
 
+/** Consume one free daily use. Returns remaining count, or -1 if the limit is reached. */
+async function tryConsumeFreeUse(userId: string): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return -1;
+  try {
+    const { data } = await supabase.auth.admin.getUserById(userId);
+    if (!data?.user) return -1;
+    const meta = (data.user.user_metadata || {}) as Record<string, unknown>;
+    const today = new Date().toISOString().slice(0, 10);
+    const used = meta.freeUseDate === today ? (meta.freeUseCount as number) || 0 : 0;
+    if (used >= FREE_DAILY_LIMIT) return -1;
+    const next = used + 1;
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: { ...meta, freeUseDate: today, freeUseCount: next },
+    });
+    if (error) return -1;
+    return FREE_DAILY_LIMIT - next;
+  } catch {
+    return -1;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const userId = await getUserIdFromRequest(request);
 
@@ -73,17 +112,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unknown skill" }, { status: 400 });
   }
 
-  const payload = body.payload || {};
-  const userId = (await getUserIdFromRequest(request)) || "anonymous";
+  // Truncate every field and cap field count — a huge payload would otherwise
+  // inflate the AI prompt and burn tokens per request.
+  const payload = sanitizePayload(body.payload || {});
+
+  // Every AI call costs tokens: require login for ALL skills, including free ones.
+  const userId = await getUserIdFromRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  }
+
   const creditCost = SKILL_CREDIT_COSTS[skill.id] || 0;
 
-  // Paid skills require login and sufficient balance. Deduct BEFORE generating
-  // the report so we never spend AI tokens on an unpaid request, and to keep the
-  // check-and-deduct window as small as possible.
-  if (creditCost > 0) {
-    if (userId === "anonymous") {
-      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+  // Free skills: enforce a per-user daily cap.
+  if (creditCost === 0) {
+    const remaining = await tryConsumeFreeUse(userId);
+    if (remaining < 0) {
+      return NextResponse.json(
+        { error: `今日免费次数已用完（每天 ${FREE_DAILY_LIMIT} 次），明天再来吧` },
+        { status: 429 },
+      );
     }
+  } else {
+    // Paid skills: require sufficient balance. Deduct BEFORE generating
+    // the report so we never spend AI tokens on an unpaid request.
     const remaining = await deductCreditsFromAuth(userId, creditCost);
     if (remaining < 0) {
       const balance = await getCreditsFromAuth(userId);

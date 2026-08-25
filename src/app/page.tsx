@@ -689,6 +689,18 @@ export default function Home() {
         return;
       }
 
+      if (response.status === 401) {
+        alert("请先登录后再使用");
+        setAuthOpen(true);
+        return;
+      }
+
+      if (response.status === 429) {
+        const errData = await response.json() as { error?: string };
+        alert(errData.error || "操作太频繁，请稍后再试");
+        return;
+      }
+
       const data = (await response.json()) as { result?: ReturnType<typeof buildMockResult> };
       setResult(data.result || buildMockResult(form, selectedSkill));
 
