@@ -10,6 +10,8 @@ export type AIMessage = {
   content: string;
 };
 
+const AI_DISABLED = true;
+
 // 优先使用 DeepSeek 直连，如果未设置则 fallback 到 AI_API_BASE_URL
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
 const BASE_URL = DEEPSEEK_KEY
@@ -21,6 +23,10 @@ const MODEL = DEEPSEEK_KEY
   : (process.env.AI_MODEL || "deepseek-chat");
 
 export async function callAI(messages: AIMessage[], options?: { temperature?: number; max_tokens?: number }) {
+  if (AI_DISABLED) {
+    throw new Error("AI service disabled");
+  }
+
   if (!API_KEY) throw new Error("AI_API_KEY 未配置");
 
   const body = {
