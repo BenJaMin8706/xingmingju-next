@@ -308,25 +308,6 @@ function buildFallbackReportResult(input: { nickname?: string; birthTime?: strin
   };
 }
 
-function normalizeAIItems(content: string) {
-  const cleaned = content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => line.replace(/^[-*\d.、\s]+/, "").trim())
-    .filter(Boolean);
-
-  if (cleaned.length >= 3) {
-    return cleaned.slice(0, 5);
-  }
-
-  return content
-    .split(/[。！？\n]/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 6)
-    .slice(0, 5);
-}
-
 export async function buildReportResult(input: { nickname?: string; birthTime?: string | null; [key: string]: unknown }, skill: Skill): Promise<ReportResult> {
   return buildFallbackReportResult(input, skill);
 }

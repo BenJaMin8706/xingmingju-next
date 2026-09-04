@@ -40,7 +40,7 @@ export default function AdminPage() {
   useEffect(() => {
     const supabase = getBrowserSupabase();
     if (!supabase) {
-      setChecking(false);
+      queueMicrotask(() => setChecking(false));
       return;
     }
     supabase.auth.getSession().then(({ data }) => {
@@ -132,7 +132,9 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (authenticated) fetchUsers();
+    if (authenticated) {
+      void Promise.resolve().then(fetchUsers);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticated]);
 
@@ -246,6 +248,7 @@ export default function AdminPage() {
           )}
 
           {loading && <p style={{ textAlign: "center", color: "#6b7280", marginTop: 24 }}>加载中...</p>}
+          {error && <p style={{ textAlign: "center", color: "#dc2626", marginTop: 24 }}>{error}</p>}
         </>
       )}
     </div>

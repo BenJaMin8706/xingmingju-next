@@ -13,5 +13,8 @@ export function GET(request: NextRequest) {
     return categoryMatch && (!query || text.includes(query));
   });
 
-  return NextResponse.json({ categories, skills: filteredSkills, total: skills.length });
+  return NextResponse.json(
+    { categories, skills: filteredSkills, total: skills.length },
+    { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600" } },
+  );
 }

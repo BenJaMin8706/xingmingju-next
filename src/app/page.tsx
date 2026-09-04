@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { TurnstileWidget } from "@/components/turnstile-widget";
@@ -224,7 +225,6 @@ const categoryLabelMap = new Map<string, string>(categories.map(([value, label])
 const navItems = ["技能", "聊天", "免费", "评价"] as const;
 type NavLabel = (typeof navItems)[number];
 
-const chatQuestionStatsKey = "xingmingju-chat-question-stats";
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 const chatPromptCategories = [
@@ -240,15 +240,6 @@ const chatPromptCategories = [
   { id: "plate", label: "车牌测吉凶", prompt: "我想看看我的车牌号码吉凶，分析数字五行组合和81数理。", keywords: ["车牌", "车号", "牌照", "车牌号"] },
   { id: "phone", label: "手机号测吉凶", prompt: "我想测一下手机号码的吉凶，分析数字磁场和能量。", keywords: ["手机号", "电话", "号码", "手机"] },
 ] as const;
-
-type ChatPromptCategory = (typeof chatPromptCategories)[number];
-
-function getLocalDateKey() {
-  const date = new Date();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 function createEmptyQuestionStats() {
   return Object.fromEntries(chatPromptCategories.map((category) => [category.id, 0])) as Record<string, number>;
@@ -304,7 +295,7 @@ function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: (skill: Skill) => 
 
   return (
     <button className="skill-card" type="button" onClick={() => onOpen(skill)}>
-      <img className={`skill-image ${skill.imageMode || ""}`} src={skill.image} alt={skill.title} crossOrigin="anonymous" referrerPolicy="no-referrer" loading="lazy" />
+      <Image className={`skill-image ${skill.imageMode || ""}`} src={skill.image} alt={skill.title} width={500} height={340} unoptimized referrerPolicy="no-referrer" />
       <span className="skill-meta">
         <span className="skill-chip">{skill.tag}</span>
         <h3>{skill.title}</h3>
@@ -355,7 +346,6 @@ export default function Home() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
-  const [authDirectUrl, setAuthDirectUrl] = useState("");
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [authPassword, setAuthPassword] = useState("");
   const [authUsername, setAuthUsername] = useState("");
@@ -409,21 +399,13 @@ export default function Home() {
     const authStatus = params.get("auth");
     if (paymentStatus === "success") {
       // Credits are added server-side by the verified Stripe webhook — never trust
-      // the client to add them. Just refresh the balance from the server.
-      setToast("🎉 支付成功！星币将在到账后自动更新");
-      if (session?.access_token) {
-        fetch("/api/user/credits", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })
-          .then((r) => r.json())
-          .then((d: { credits?: number }) => setCredits(d.credits || 0))
-          .catch(() => {});
-      }
+      // the client to add them. The session effect refreshes the server balance.
+      queueMicrotask(() => setToast("🎉 支付成功！星币将在到账后自动更新"));
       window.history.replaceState({}, "", "/");
     } else if (paymentStatus === "cancelled") {
       window.history.replaceState({}, "", "/");
     } else if (authStatus === "verified") {
-      setToast("邮箱验证已完成，现在可以直接登录了");
+      queueMicrotask(() => setToast("邮箱验证已完成，现在可以直接登录了"));
       window.history.replaceState({}, "", "/");
     }
   }, []);
@@ -447,13 +429,23 @@ export default function Home() {
   }, [supabase]);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!session?.access_token) {
-      setSavedReports([]);
-      setCredits(0);
-      return;
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setSavedReports([]);
+          setCredits(0);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
-    setReportsLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) setReportsLoading(true);
+    });
     fetch("/api/reports", {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -492,6 +484,10 @@ export default function Home() {
         }
       })
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [session?.access_token]);
 
   function resetFilters() {
@@ -763,7 +759,7 @@ export default function Home() {
       <header className="app-header">
         <div className="header-inner">
           <a className="brand" href="#top" aria-label="星命局首页">
-            <img src="/logo.svg" alt="星命局 · AI运势技能商店" className="brand-logo" />
+            <Image src="/logo.svg" alt="星命局 · AI运势技能商店" className="brand-logo" width={500} height={140} priority />
           </a>
           <label className="search-box"><span className="search-label">搜索<span className="search-divider" aria-hidden="true">|</span></span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="复合、财运、塔罗、八字" /></label>
           <nav className="main-tabs" aria-label="主导航">
@@ -922,7 +918,7 @@ export default function Home() {
               <button className="close-btn" type="button" onClick={() => setSelectedSkill(null)} aria-label="关闭">×</button>
               <div className="skill-detail">
                 <div className="detail-hero">
-                  <img className={selectedSkill.imageMode || ""} src={selectedSkill.image} alt={selectedSkill.title} crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                  <Image className={selectedSkill.imageMode || ""} src={selectedSkill.image} alt={selectedSkill.title} width={800} height={560} unoptimized referrerPolicy="no-referrer" />
                   <div className="detail-copy"><span className="skill-chip">{selectedSkill.tag}</span><h2 id="skillTitle">{selectedSkill.title}</h2><p>{selectedSkill.desc}</p><div className="detail-stats"><span>评分 {selectedSkill.rating}</span><span>用户 {selectedSkill.users}</span><span>{selectedSkill.teacher}</span></div><div className="purchase-panel"><div><strong>{selectedSkill.price} 星币</strong> {selectedSkill.price !== "0" && <><del>{selectedSkill.oldPrice} 星币</del></>}<p>购买前先补齐资料，AI会按报告模板生成结果。</p></div><a className="purchase-btn" href="#order-form">开始测算</a></div></div>
                 </div>
                 <form className="intake-form" id="order-form" onSubmit={submitOrder}>

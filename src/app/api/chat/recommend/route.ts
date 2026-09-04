@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as { question?: string; record?: boolean };
-  const question = body.question?.trim() || "我想先做一次免费体验";
+  const question = body.question?.trim().slice(0, 500) || "我想先做一次免费体验";
   const matchedCategory = findQuestionCategory(question);
   const stats = body.record === false ? null : await recordQuestionCategory(matchedCategory.id);
 

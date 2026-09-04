@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import Script from "next/script";
 
 declare global {
@@ -33,6 +33,8 @@ export function TurnstileWidget({ siteKey, onToken, onError }: TurnstileWidgetPr
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
+  const handleToken = useEffectEvent(onToken);
+  const handleError = useEffectEvent(onError);
 
   useEffect(() => {
     if (!scriptReady || !containerRef.current || !window.turnstile || widgetIdRef.current) {
@@ -42,11 +44,11 @@ export function TurnstileWidget({ siteKey, onToken, onError }: TurnstileWidgetPr
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
       theme: "light",
-      callback: (token) => onToken(token),
-      "expired-callback": () => onToken(""),
+      callback: (token) => handleToken(token),
+      "expired-callback": () => handleToken(""),
       "error-callback": () => {
-        onToken("");
-        onError();
+        handleToken("");
+        handleError();
       },
     });
 
@@ -56,7 +58,7 @@ export function TurnstileWidget({ siteKey, onToken, onError }: TurnstileWidgetPr
         widgetIdRef.current = null;
       }
     };
-  }, [onError, onToken, scriptReady, siteKey]);
+  }, [scriptReady, siteKey]);
 
   return (
     <>

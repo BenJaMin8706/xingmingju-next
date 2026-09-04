@@ -22,6 +22,18 @@ const SKILL_CREDIT_COSTS: Record<string, number> = {
   "phone-fortune": 15,
 };
 
+function sanitizePayload(payload: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(payload)
+      .slice(0, 30)
+      .filter(([, value]) => ["string", "number", "boolean"].includes(typeof value))
+      .map(([key, value]) => [
+        key.slice(0, 80),
+        typeof value === "string" ? value.trim().slice(0, 1000) : value,
+      ]),
+  );
+}
+
 async function getCreditsFromAuth(userId: string): Promise<number> {
   if (!userId || userId === "anonymous") return 0;
   const supabase = getSupabase();
@@ -57,7 +69,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unknown skill" }, { status: 400 });
   }
 
-  const payload = body.payload || {};
+  const payload = sanitizePayload(body.payload || {});
   const userId = (await getUserIdFromRequest(request)) || "anonymous";
   const creditCost = SKILL_CREDIT_COSTS[skill.id] || 0;
   const requestId = crypto.randomUUID();

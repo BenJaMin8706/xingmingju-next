@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       totalCredits: users.reduce((sum, u) => sum + u.credits, 0),
       users,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
   }
 }

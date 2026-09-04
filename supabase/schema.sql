@@ -91,6 +91,34 @@ $$;
 revoke all on function public.adjust_user_credits(uuid, integer, text, text) from public, anon, authenticated;
 grant execute on function public.adjust_user_credits(uuid, integer, text, text) to service_role;
 
+create or replace function public.increment_question_stat(p_date date, p_category text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  updated_counts jsonb;
+begin
+  insert into public.question_stats (date, counts, updated_at)
+    values (p_date, jsonb_build_object(p_category, 1), now())
+  on conflict (date) do update
+    set counts = jsonb_set(
+      public.question_stats.counts,
+      array[p_category],
+      to_jsonb(coalesce((public.question_stats.counts ->> p_category)::integer, 0) + 1),
+      true
+    ),
+    updated_at = now()
+  returning counts into updated_counts;
+
+  return updated_counts;
+end;
+$$;
+
+revoke all on function public.increment_question_stat(date, text) from public, anon, authenticated;
+grant execute on function public.increment_question_stat(date, text) to service_role;
+
 -- The service role key bypasses RLS, so this is enough for the server to read/write.
 -- If you ever expose these tables to the browser, add Row Level Security policies first.
 alter table public.question_stats enable row level security;

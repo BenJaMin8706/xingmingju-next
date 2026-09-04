@@ -77,7 +77,22 @@ export async function readQuestionStats(): Promise<QuestionStatsFile> {
 export async function recordQuestionCategory(categoryId: string) {
   const supabase = getSupabase();
   const today = getLocalDateKey();
-  const current = await readQuestionStats();
+  if (supabase) {
+    const { data, error } = await supabase.rpc("increment_question_stat", {
+      p_date: today,
+      p_category: categoryId,
+    });
+
+    if (!error && data) {
+      return {
+        date: today,
+        counts: { ...createEmptyQuestionStats(), ...(data as Record<string, number>) },
+      };
+    }
+    console.error("[supabase] recordQuestionCategory", error?.message || "No data returned");
+  }
+
+  const current = await readStatsFromFile();
   const nextStats: QuestionStatsFile = {
     date: today,
     counts: {
@@ -86,20 +101,7 @@ export async function recordQuestionCategory(categoryId: string) {
       [categoryId]: (current.counts[categoryId] || 0) + 1,
     },
   };
-
-  if (!supabase) {
-    await writeStatsToFile(nextStats);
-    return nextStats;
-  }
-
-  const { error } = await supabase
-    .from("question_stats")
-    .upsert({ date: today, counts: nextStats.counts }, { onConflict: "date" });
-
-  if (error) {
-    console.error("[supabase] recordQuestionCategory", error.message);
-    await writeStatsToFile(nextStats);
-  }
+  await writeStatsToFile(nextStats);
   return nextStats;
 }
 
