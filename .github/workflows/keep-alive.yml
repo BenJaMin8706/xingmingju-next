@@ -19,13 +19,14 @@ jobs:
         run: |
           set -e
           echo "=== $(date -u) ==="
+          CURL_FLAGS="--retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20"
 
           # 1. Frontend must be up
-          HOME_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://xingmingju-next.vercel.app/)
+          HOME_CODE=$(curl -s -o /dev/null -w "%{http_code}" $CURL_FLAGS https://xingmingju-next.vercel.app/)
           echo "Homepage: HTTP $HOME_CODE"
 
           # 2. Auth service must be up
-          AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://ycefjltmcjkwavlihcsu.supabase.co/auth/v1/settings)
+          AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" $CURL_FLAGS https://ycefjltmcjkwavlihcsu.supabase.co/auth/v1/settings)
           echo "Auth: HTTP $AUTH_CODE"
           # 401 means the auth service responded (it requires an apikey header)
           if [ "$AUTH_CODE" != "401" ] && [ "$AUTH_CODE" != "200" ]; then
@@ -37,7 +38,7 @@ jobs:
           #    A 401 is expected (no SELECT grant for anon) but proves Postgres
           #    is serving queries — which is what counts as activity.
           ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZWZqbHRtY2prd2F2bGloY3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NTAzODYsImV4cCI6MjA5NTAyNjM4Nn0.wP1_aecc6oNctjraPAprenr47SrglLWeemX3yXS-fd4"
-          REST_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 \
+          REST_CODE=$(curl -s -o /dev/null -w "%{http_code}" $CURL_FLAGS \
             -H "apikey: $ANON_KEY" \
             "https://ycefjltmcjkwavlihcsu.supabase.co/rest/v1/question_stats?limit=1")
           echo "PostgREST: HTTP $REST_CODE"

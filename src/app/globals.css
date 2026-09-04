@@ -276,6 +276,8 @@ h1 { max-width: 660px; margin-bottom: 18px; font-size: clamp(2.35rem, 4.2vw, 4re
 .auth-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .auth-row label { display: grid; gap: 8px; color: var(--muted); font-size: 0.92rem; }
 .auth-row input { min-height: 44px; width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: #fff; color: var(--ink); }
+.auth-captcha { display: flex; justify-content: center; min-height: 66px; margin-top: 4px; }
+.auth-notice { text-align: center; }
 @media (max-width: 520px) { .auth-row { grid-template-columns: 1fr; } }
 
 @media (max-width: 980px) { .header-inner, .hero-store, .store-grid, .chat-section, .free-zone, .detail-hero, .site-footer { grid-template-columns: 1fr; } .right-rail { position: static; } .main-tabs { overflow-x: auto; } .header-actions { justify-content: flex-start; } .footer-links { justify-content: flex-start; } }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 type Skill = {
@@ -224,6 +225,7 @@ const navItems = ["技能", "聊天", "免费", "评价"] as const;
 type NavLabel = (typeof navItems)[number];
 
 const chatQuestionStatsKey = "xingmingju-chat-question-stats";
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 const chatPromptCategories = [
   { id: "relationship-stage", label: "关系阶段", prompt: "我们现在处在暧昧、断联或分手后的哪个阶段？我想判断下一步该主动还是观察。", keywords: ["暧昧", "断联", "分手", "复合", "阶段", "主动", "观察"] },
@@ -360,6 +362,9 @@ export default function Home() {
   const [authBirthDate, setAuthBirthDate] = useState("");
   const [authBirthTime, setAuthBirthTime] = useState("");
   const [authBirthPlace, setAuthBirthPlace] = useState("");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [registerCaptchaToken, setRegisterCaptchaToken] = useState("");
+  const [registerCaptchaKey, setRegisterCaptchaKey] = useState(0);
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [credits, setCredits] = useState(0);
@@ -401,6 +406,7 @@ export default function Home() {
     // Handle Stripe return
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
+    const authStatus = params.get("auth");
     if (paymentStatus === "success") {
       // Credits are added server-side by the verified Stripe webhook — never trust
       // the client to add them. Just refresh the balance from the server.
@@ -415,6 +421,9 @@ export default function Home() {
       }
       window.history.replaceState({}, "", "/");
     } else if (paymentStatus === "cancelled") {
+      window.history.replaceState({}, "", "/");
+    } else if (authStatus === "verified") {
+      setToast("邮箱验证已完成，现在可以直接登录了");
       window.history.replaceState({}, "", "/");
     }
   }, []);
@@ -488,6 +497,17 @@ export default function Home() {
   function resetFilters() {
     setQuery("");
     setActiveCategory("all");
+  }
+
+  function resetRegisterCaptcha() {
+    setRegisterCaptchaToken("");
+    setRegisterCaptchaKey((value) => value + 1);
+  }
+
+  function resetAuthFeedback() {
+    setAuthError("");
+    setAuthMessage("");
+    setPendingVerificationEmail("");
   }
 
   function scrollToSection(id: string) {
@@ -587,6 +607,7 @@ export default function Home() {
     } else {
       setAuthOpen(false);
       setAuthPassword("");
+      setPendingVerificationEmail("");
       setToast("👋 登录成功");
     }
     setAuthBusy(false);
@@ -594,48 +615,59 @@ export default function Home() {
 
   async function handleRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase) {
-      setAuthError("注册服务未配置。");
+    if (!turnstileSiteKey) {
+      setAuthError("注册验证码未配置，暂时无法开放注册。");
       return;
     }
     if (authPassword.length < 6) {
       setAuthError("密码至少需要6位");
       return;
     }
+    if (!registerCaptchaToken) {
+      setAuthError("请先完成人机验证");
+      return;
+    }
     setAuthBusy(true);
     setAuthError("");
     setAuthMessage("");
 
-    const { error } = await supabase.auth.signUp({
-      email: authEmail.trim(),
-      password: authPassword,
-      options: {
-        data: {
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: authEmail.trim(),
+          password: authPassword,
           username: authUsername.trim(),
           birthDate: authBirthDate,
           birthTime: authBirthTime,
           birthPlace: authBirthPlace.trim(),
-        },
-      },
-    });
+          captchaToken: registerCaptchaToken,
+        }),
+      });
+      const data = await response.json() as { error?: string; message?: string };
 
-    if (error) {
-      setAuthError(error.message === "User already registered"
-        ? "该邮箱已注册，请直接登录"
-        : error.message);
-    } else {
-      setAuthMessage("注册成功！验证邮件已发送，请检查邮箱并点击验证链接。");
-      setAuthPassword("");
+      if (!response.ok) {
+        setAuthError(data.error || "注册失败，请稍后重试");
+        resetRegisterCaptcha();
+      } else {
+        setPendingVerificationEmail(authEmail.trim());
+        setAuthMessage(data.message || `注册成功！验证邮件已发送到 ${authEmail.trim()}，完成验证后会自动返回首页。`);
+        setAuthPassword("");
+        resetRegisterCaptcha();
+      }
+    } catch {
+      setAuthError("网络错误，请稍后重试");
+      resetRegisterCaptcha();
     }
     setAuthBusy(false);
   }
 
   async function handleLogout() {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     setAuthOpen(false);
-    setAuthMessage("");
-    setAuthError("");
+    resetAuthFeedback();
     setAuthPassword("");
   }
 
@@ -739,7 +771,7 @@ export default function Home() {
                 <button className="secondary-btn" type="button" onClick={handleLogout}>退出</button>
               </>
             ) : (
-              <button className="secondary-btn" type="button" onClick={() => setAuthOpen(true)}>登录 / 注册</button>
+              <button className="secondary-btn" type="button" onClick={() => { setAuthOpen(true); setAuthTab("login"); resetAuthFeedback(); resetRegisterCaptcha(); }}>登录 / 注册</button>
             )}
           </div>
         </div>
@@ -957,17 +989,17 @@ export default function Home() {
       )}
 
       {authOpen && (
-        <div className="modal-backdrop" role="presentation" onClick={() => setAuthOpen(false)}>
+        <div className="modal-backdrop" role="presentation" onClick={() => { setAuthOpen(false); resetAuthFeedback(); resetRegisterCaptcha(); }}>
           <section className="skill-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle" onClick={(e) => e.stopPropagation()}>
             <div className="dialog-shell auth-dialog">
-              <button className="close-btn" type="button" onClick={() => { setAuthOpen(false); setAuthError(""); setAuthMessage(""); }} aria-label="关闭">×</button>
+              <button className="close-btn" type="button" onClick={() => { setAuthOpen(false); resetAuthFeedback(); resetRegisterCaptcha(); }} aria-label="关闭">×</button>
 
               {/* Tab switcher */}
               <div className="auth-tabs">
-                <button className={authTab === "login" ? "active" : ""} type="button" onClick={() => { setAuthTab("login"); setAuthError(""); setAuthMessage(""); }}>
+                <button className={authTab === "login" ? "active" : ""} type="button" onClick={() => { setAuthTab("login"); resetAuthFeedback(); resetRegisterCaptcha(); }}>
                   登录
                 </button>
-                <button className={authTab === "register" ? "active" : ""} type="button" onClick={() => { setAuthTab("register"); setAuthError(""); setAuthMessage(""); }}>
+                <button className={authTab === "register" ? "active" : ""} type="button" onClick={() => { setAuthTab("register"); resetAuthFeedback(); resetRegisterCaptcha(); }}>
                   注册
                 </button>
               </div>
@@ -995,8 +1027,19 @@ export default function Home() {
                       <label>出生时间<input type="time" value={authBirthTime} onChange={(e) => setAuthBirthTime(e.target.value)} /></label>
                     </div>
                     <label>出生地<input type="text" value={authBirthPlace} onChange={(e) => setAuthBirthPlace(e.target.value)} placeholder="例如：杭州" /></label>
+                    {turnstileSiteKey ? (
+                      <TurnstileWidget
+                        key={registerCaptchaKey}
+                        siteKey={turnstileSiteKey}
+                        onToken={setRegisterCaptchaToken}
+                        onError={() => setAuthError("人机验证加载失败，请稍后重试")}
+                      />
+                    ) : (
+                      <p className="helper-text error-text auth-notice">注册验证码尚未配置，当前不能开放注册。</p>
+                    )}
+                    {pendingVerificationEmail ? <p className="helper-text success-text auth-notice">验证邮件将发送到 {pendingVerificationEmail}，验证完成后会自动返回首页。</p> : null}
                     <p className="helper-text" style={{ fontSize: 12, marginBottom: 4 }}>这些信息会在你购买技能时自动填入，省去重复填写</p>
-                    <button className="purchase-btn" type="submit" disabled={authBusy}>{authBusy ? "注册中..." : "注册"}</button>
+                    <button className="purchase-btn" type="submit" disabled={authBusy || !turnstileSiteKey}>{authBusy ? "注册中..." : "注册"}</button>
                   </form>
                 </>
               )}
