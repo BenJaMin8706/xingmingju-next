@@ -68,12 +68,17 @@ begin
   end if;
 
   update auth.users
-    set raw_user_meta_data = jsonb_set(
-      coalesce(raw_user_meta_data, '{}'::jsonb),
-      '{credits}',
-      to_jsonb(updated_balance),
-      true
-    )
+    set raw_user_meta_data = case
+      when p_reason = 'welcome_bonus' then
+        jsonb_set(
+          jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{credits}', to_jsonb(updated_balance), true),
+          '{welcomeBonusGranted}',
+          'true'::jsonb,
+          true
+        )
+      else
+        jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{credits}', to_jsonb(updated_balance), true)
+      end
     where id = p_user_id;
 
   insert into public.credit_events (event_id, user_id, delta, reason)

@@ -62,13 +62,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "充值失败" }, { status: 500 });
   }
 
-  const meta = await getUserMeta(userId);
-  if (meta && !meta.welcomeBonusGranted) {
-    await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { ...meta, welcomeBonusGranted: true },
-    });
-  }
-
   return NextResponse.json({
     credits: adjustment.newBalance,
     welcomeGranted: true,
