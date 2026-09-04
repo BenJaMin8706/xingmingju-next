@@ -85,7 +85,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 
 ## 注册与人机验证上线清单
 
-当前注册已改为：前端展示 Turnstile，人机验证 token 先提交到服务端，由服务端校验通过后再调用 Supabase 注册。
+当前注册已改为：前端展示 Turnstile，人机验证 token 通过站内注册接口提交给 Supabase Auth，由 Supabase 完成一次服务端校验后再创建账号。
 
 ### 1. 在 Cloudflare Turnstile 创建站点
 
@@ -104,18 +104,17 @@ SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=
-TURNSTILE_SECRET_KEY=
 ```
 
 说明：
 
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` 用于前端渲染验证码。
-- `TURNSTILE_SECRET_KEY` 只给服务端校验验证码使用，不能放到前端。
+- Turnstile `Secret Key` 只填入 Supabase Auth 的 CAPTCHA 配置，不能放到前端或提交到仓库。
 - 如果仍保留旧的 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 也可以，但浏览器端优先建议使用 `publishable key`。
 
 ### 3. 在 Supabase 开启 Auth CAPTCHA
 
-建议不要只依赖前端验证码，还要在 Supabase 控制台再开一层：
+必须在 Supabase 控制台启用服务端验证：
 
 - 进入 `Auth`。
 - 打开 `Bot and Abuse Protection`。
@@ -123,7 +122,7 @@ TURNSTILE_SECRET_KEY=
 - Provider 选择 `Cloudflare Turnstile`。
 - 填入同一套 `Secret Key` 并保存。
 
-这样即使有人绕过你的页面，直接请求 Supabase 注册接口，也会被 Supabase 自己拦住。
+Turnstile token 是单次使用的，因此不要在站内 API 和 Supabase 各验证一次。由 Supabase 唯一验证既能避免 `timeout-or-duplicate`，也能拦截绕过本站页面、直接请求 Supabase 的注册行为。
 
 ### 4. 在 Supabase 配置回跳地址
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildReportResult, skills } from "@/lib/fortune-data";
 import { getUserIdFromRequest } from "@/lib/auth-server";
+import { adjustUserCredits } from "@/lib/credits";
 import { appendReport, listReportsByUser } from "@/lib/server-store";
 import { getSupabase } from "@/lib/supabase";
 
@@ -34,23 +35,6 @@ async function getCreditsFromAuth(userId: string): Promise<number> {
   }
 }
 
-async function deductCreditsFromAuth(userId: string, amount: number): Promise<number> {
-  if (!userId || userId === "anonymous" || amount <= 0) return -1;
-  const supabase = getSupabase();
-  if (!supabase) return -1;
-  try {
-    const { data } = await supabase.auth.admin.getUserById(userId);
-    if (!data?.user) return -1;
-    const current = (data.user.user_metadata as Record<string, unknown>)?.credits as number || 0;
-    if (current < amount) return -1;
-    const newCredits = current - amount;
-    await supabase.auth.admin.updateUserById(userId, { user_metadata: { credits: newCredits } });
-    return newCredits;
-  } catch {
-    return -1;
-  }
-}
-
 export async function GET(request: NextRequest) {
   const userId = await getUserIdFromRequest(request);
 
@@ -76,6 +60,7 @@ export async function POST(request: NextRequest) {
   const payload = body.payload || {};
   const userId = (await getUserIdFromRequest(request)) || "anonymous";
   const creditCost = SKILL_CREDIT_COSTS[skill.id] || 0;
+  const requestId = crypto.randomUUID();
 
   // Paid skills require login and sufficient balance. Deduct BEFORE generating
   // the report so we never spend AI tokens on an unpaid request, and to keep the
@@ -84,8 +69,8 @@ export async function POST(request: NextRequest) {
     if (userId === "anonymous") {
       return NextResponse.json({ error: "请先登录" }, { status: 401 });
     }
-    const remaining = await deductCreditsFromAuth(userId, creditCost);
-    if (remaining < 0) {
+    const adjustment = await adjustUserCredits(userId, -creditCost, "report_generation", `report:${requestId}`);
+    if (!adjustment?.success) {
       const balance = await getCreditsFromAuth(userId);
       return NextResponse.json({
         error: "星币不足",
@@ -96,15 +81,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const result = await buildReportResult(
-    {
-      ...payload,
-      nickname: typeof payload.nickname === "string" ? payload.nickname : undefined,
-      birthTime: typeof payload.birthTime === "string" ? payload.birthTime : null,
-    },
-    skill,
-  );
+  try {
+    const result = await buildReportResult(
+      {
+        ...payload,
+        nickname: typeof payload.nickname === "string" ? payload.nickname : undefined,
+        birthTime: typeof payload.birthTime === "string" ? payload.birthTime : null,
+      },
+      skill,
+    );
 
-  const record = await appendReport({ skillId: skill.id, userId, payload, result });
-  return NextResponse.json({ reportId: record.id, result });
+    const record = await appendReport({ skillId: skill.id, userId, payload, result });
+    return NextResponse.json({ reportId: record.id, result });
+  } catch (error) {
+    if (creditCost > 0 && userId !== "anonymous") {
+      await adjustUserCredits(userId, creditCost, "report_refund", `refund:${requestId}`);
+    }
+    console.error("[reports] generation failed:", error);
+    return NextResponse.json({ error: "报告生成失败，请稍后重试" }, { status: 500 });
+  }
 }

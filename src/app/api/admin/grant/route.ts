@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/admin-auth";
+import { adjustUserCredits } from "@/lib/credits";
 import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -48,17 +49,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "未找到该邮箱的用户，请确认对方已注册" }, { status: 404 });
     }
 
-    // Get current credits
     const currentCredits = (targetUser.user_metadata as Record<string, unknown>)?.credits as number || 0;
-    const newCredits = currentCredits + credits;
+    const adjustment = await adjustUserCredits(
+      targetUser.id,
+      credits,
+      "admin_grant",
+      `admin:${crypto.randomUUID()}`,
+    );
 
-    // Update
-    const { error: updateError } = await supabase.auth.admin.updateUserById(targetUser.id, {
-      user_metadata: { ...targetUser.user_metadata, credits: newCredits },
-    });
-
-    if (updateError) {
-      return NextResponse.json({ error: "充值失败: " + updateError.message }, { status: 500 });
+    if (!adjustment?.success) {
+      return NextResponse.json({ error: "充值失败" }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
       email: targetUser.email,
       before: currentCredits,
       added: credits,
-      after: newCredits,
+      after: adjustment.newBalance,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserIdFromRequest } from "@/lib/auth-server";
 import { getStripe } from "@/lib/stripe";
 
 const CREDIT_PRICES: Record<string, { credits: number; name: string; price: number }> = {
@@ -10,7 +11,12 @@ const CREDIT_PRICES: Record<string, { credits: number; name: string; price: numb
 
 export async function POST(request: NextRequest) {
   try {
-    const { packageId, userId } = await request.json();
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    }
+
+    const { packageId } = await request.json();
     const priceConfig = CREDIT_PRICES[packageId];
     if (!priceConfig) {
       return NextResponse.json({ error: "无效的套餐" }, { status: 400 });
@@ -42,7 +48,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      metadata: { userId: userId || "anonymous", packageId, credits: String(priceConfig.credits) },
+      client_reference_id: userId,
+      metadata: { userId, packageId, credits: String(priceConfig.credits) },
       success_url: `${origin}/?payment=success&credits=${priceConfig.credits}`,
       cancel_url: `${origin}/?payment=cancelled`,
     });

@@ -674,13 +674,19 @@ export default function Home() {
   async function handleBuyCredits(packageId: string) {
     setBuyBusy(true);
     try {
+      if (!session?.access_token) {
+        alert("请先登录");
+        setBuyBusy(false);
+        return;
+      }
+
       const resp = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          packageId,
-          userId: user?.id || "anonymous",
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ packageId }),
       });
       const data = await resp.json();
       if (data.demo) {
@@ -688,7 +694,7 @@ export default function Home() {
         // credits from the client — that would let anyone top up for free.
         alert("支付功能尚未开通，请稍后再试或联系客服");
       } else if (data.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       } else {
         alert("支付暂不可用，请稍后再试");
       }

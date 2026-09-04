@@ -3,46 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
-const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
-
-type TurnstileResponse = {
-  success?: boolean;
-  "error-codes"?: string[];
-};
-
-function getRemoteIp(request: NextRequest) {
-  const forwardedFor = request.headers.get("x-forwarded-for") || "";
-  return forwardedFor.split(",")[0]?.trim() || undefined;
-}
-
-async function verifyTurnstileToken(token: string, remoteIp?: string) {
-  if (!TURNSTILE_SECRET_KEY) {
-    return { ok: false, reason: "人机验证服务未配置" };
-  }
-
-  const body = new URLSearchParams({
-    secret: TURNSTILE_SECRET_KEY,
-    response: token,
-  });
-  if (remoteIp) body.set("remoteip", remoteIp);
-
-  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  if (!response.ok) {
-    return { ok: false, reason: "人机验证服务暂时不可用" };
-  }
-
-  const data = (await response.json()) as TurnstileResponse;
-  if (!data.success) {
-    return { ok: false, reason: "人机验证未通过" };
-  }
-
-  return { ok: true as const };
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,15 +43,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请先完成人机验证" }, { status: 400 });
     }
 
-    const turnstile = await verifyTurnstileToken(captchaToken, getRemoteIp(request));
-    if (!turnstile.ok) {
-      return NextResponse.json({ error: turnstile.reason }, { status: 403 });
-    }
-
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        captchaToken,
         emailRedirectTo: `${request.nextUrl.origin}/?auth=verified`,
         data: {
           username: body.username?.trim() || "",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adjustUserCredits } from "@/lib/credits";
 import { getStripe } from "@/lib/stripe";
-import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -23,46 +23,6 @@ const CREDIT_MAP: Record<string, number> = {
   "1200": 1200,
   monthly: 300,
 };
-
-async function addCreditsToUser(userId: string, credits: number): Promise<boolean> {
-  if (!userId || userId === "anonymous") {
-    console.warn("Webhook received payment for anonymous user, skipping");
-    return false;
-  }
-
-  const supabase = getSupabase();
-  if (!supabase) {
-    console.error("Supabase not configured for webhook credit update");
-    return false;
-  }
-
-  try {
-    // Get current credits from auth metadata
-    const { data: userData, error: getUserError } = await supabase.auth.admin.getUserById(userId);
-    if (getUserError || !userData?.user) {
-      console.error("Failed to get user for credit update:", getUserError?.message);
-      return false;
-    }
-
-    const currentCredits = (userData.user.user_metadata as Record<string, unknown>)?.credits as number || 0;
-    const newCredits = currentCredits + credits;
-
-    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { credits: newCredits },
-    });
-
-    if (updateError) {
-      console.error("Failed to update user credits:", updateError.message);
-      return false;
-    }
-
-    console.log(`Added ${credits} credits to user ${userId}, balance: ${newCredits}`);
-    return true;
-  } catch (err) {
-    console.error("Error in webhook credit update:", err);
-    return false;
-  }
-}
 
 export async function POST(request: NextRequest) {
   const stripe = getStripe();
@@ -88,12 +48,13 @@ export async function POST(request: NextRequest) {
       const session = event.data.object;
       const userId = session.metadata?.userId || session.client_reference_id || "";
       const packageId = session.metadata?.packageId || "";
-      const credits = CREDIT_MAP[packageId] || parseInt(session.metadata?.credits || "0", 10);
+      const credits = CREDIT_MAP[packageId] || 0;
 
       if (userId && credits > 0) {
-        const success = await addCreditsToUser(userId, credits);
-        if (!success) {
+        const adjustment = await adjustUserCredits(userId, credits, "stripe_payment", `stripe:${event.id}`);
+        if (!adjustment?.success) {
           console.error(`Failed to credit ${credits} to user ${userId}`);
+          return NextResponse.json({ error: "Credit update failed" }, { status: 500 });
         }
       }
     }

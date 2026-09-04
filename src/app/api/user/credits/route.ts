@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/lib/auth-server";
+import { adjustUserCredits } from "@/lib/credits";
 import { getSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -56,26 +57,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "服务未配置" }, { status: 503 });
   }
 
-  const meta = await getUserMeta(userId);
-  if (!meta) {
-    return NextResponse.json({ error: "查询失败" }, { status: 500 });
-  }
-
-  const current = (meta.credits as number) || 0;
-
-  // Already claimed – return current balance, do not add again.
-  if (meta.welcomeBonusGranted) {
-    return NextResponse.json({ credits: current, welcomeGranted: true, added: 0 });
-  }
-
-  const newCredits = current + WELCOME_BONUS;
-  const { error } = await supabase.auth.admin.updateUserById(userId, {
-    user_metadata: { ...meta, credits: newCredits, welcomeBonusGranted: true },
-  });
-
-  if (error) {
+  const adjustment = await adjustUserCredits(userId, WELCOME_BONUS, "welcome_bonus", `welcome:${userId}`);
+  if (!adjustment?.success) {
     return NextResponse.json({ error: "充值失败" }, { status: 500 });
   }
 
-  return NextResponse.json({ credits: newCredits, welcomeGranted: true, added: WELCOME_BONUS });
+  const meta = await getUserMeta(userId);
+  if (meta && !meta.welcomeBonusGranted) {
+    await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: { ...meta, welcomeBonusGranted: true },
+    });
+  }
+
+  return NextResponse.json({
+    credits: adjustment.newBalance,
+    welcomeGranted: true,
+    added: adjustment.duplicate ? 0 : WELCOME_BONUS,
+  });
 }
