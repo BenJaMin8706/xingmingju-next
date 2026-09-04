@@ -81,7 +81,7 @@ h1 { max-width: 660px; margin-bottom: 18px; font-size: clamp(2.35rem, 4.2vw, 4re
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 .store-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; margin-top: 10px; }
-.content-feed, .right-rail { display: grid; gap: 18px; }
+.content-feed, .right-rail { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 18px; }
 .right-rail { position: sticky; top: 92px; }
 .skill-section, .chat-section, .free-zone { scroll-margin-top: 92px; padding: 22px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
