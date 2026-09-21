@@ -69,17 +69,28 @@ jobs:
             "https://$SUPABASE_HOST/auth/v1/settings" || echo "000")
           if [ "$AUTH_CODE" = "200" ]; then pass "Auth 服务 HTTP $AUTH_CODE"; else fail "Auth 服务 HTTP $AUTH_CODE"; fi
 
-          # 4. PostgREST — the only probe that guarantees Postgres activity
-          REST_CODE=$($CURL -o /dev/null -w "%{http_code}" \
+          # 4. PostgREST — the only probe that guarantees Postgres activity.
+          #    IMPORTANT: a gateway rejection (bad key) returns 401 with an EMPTY
+          #    body, whereas a *database* rejection returns JSON such as
+          #    {"code":"42501","message":"permission denied for table ..."}.
+          #    Only the JSON form proves the query reached Postgres — and reaching
+          #    Postgres is exactly what counts as project activity, so it counts as
+          #    success here rather than a failure.
+          REST_OUT=$($CURL -w $'\n%{http_code}' \
             -H "apikey: $SUPABASE_KEY" \
             -H "Authorization: Bearer $SUPABASE_KEY" \
-            "https://$SUPABASE_HOST/rest/v1/question_stats?select=date&limit=1" || echo "000")
-          case "$REST_CODE" in
-            200|206) pass "PostgREST HTTP $REST_CODE（查询已到达 Postgres，计入项目活动）" ;;
-            403)     pass "PostgREST HTTP $REST_CODE（数据库已响应，计入项目活动）" ;;
-            401)     fail "PostgREST HTTP 401：密钥被网关拒绝，请求未到达数据库，不计入活动" ;;
-            *)       fail "PostgREST HTTP $REST_CODE：无法确认请求到达数据库" ;;
-          esac
+            "https://$SUPABASE_HOST/rest/v1/question_stats?select=date&limit=1" || printf '\n000')
+          REST_CODE=$(printf '%s' "$REST_OUT" | tail -n1)
+          REST_BODY=$(printf '%s' "$REST_OUT" | sed '$d')
+
+          if printf '%s' "$REST_BODY" | grep -q '"code"'; then
+            pass "PostgREST HTTP $REST_CODE：返回数据库错误体，请求已到达 Postgres，计入项目活动"
+          else
+            case "$REST_CODE" in
+              200|206) pass "PostgREST HTTP $REST_CODE（查询已到达 Postgres，计入项目活动）" ;;
+              *)       fail "PostgREST HTTP $REST_CODE：未确认请求到达数据库" ;;
+            esac
+          fi
 
           {
             echo "### Supabase 保活检查"
