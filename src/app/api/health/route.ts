@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getServerKeyFormat,
+  getServerKeyRole,
   getServerKeySource,
   getSupabase,
 } from "@/lib/supabase";
@@ -37,9 +38,10 @@ export async function GET() {
   const supabase = getSupabase();
 
   const diagnostics = {
-    v: 2,
+    v: 3,
     keySource: getServerKeySource(),
     keyFormat: getServerKeyFormat(),
+    keyRole: getServerKeyRole(),
   };
 
   if (!supabase) {

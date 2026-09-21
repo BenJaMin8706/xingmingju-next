@@ -44,6 +44,31 @@ export function getServerKeyFormat(): string {
   return "unknown";
 }
 
+/**
+ * Role carried by the key, read straight from the JWT payload (which is base64,
+ * not encrypted — the signature is what is secret, not this claim). Knowing
+ * whether the server runs as `service_role` or `anon` is what decides whether a
+ * 42501 means "wrong key" or "missing grant", and a role name is not a secret.
+ */
+export function getServerKeyRole(): string {
+  const { key } = resolveServerKey();
+  if (!key) return "none";
+
+  const parts = key.split(".");
+  if (parts.length !== 3) return "not-a-jwt";
+
+  try {
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), "=");
+    const claims = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as {
+      role?: unknown;
+    };
+    return typeof claims.role === "string" ? claims.role : "unknown";
+  } catch {
+    return "unparsable";
+  }
+}
+
 export function getSupabase(): SupabaseClient | null {
   if (cachedClient) return cachedClient;
 
