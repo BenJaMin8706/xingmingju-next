@@ -316,3 +316,14 @@ h1 { max-width: 660px; margin-bottom: 18px; font-size: clamp(2.35rem, 4.2vw, 4re
   from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* Backend outage banner — shown when /api/health reports the database is down */
+.service-banner {
+  padding: 10px 18px;
+  background: #7f1d1d;
+  color: #fee2e2;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.55;
+}

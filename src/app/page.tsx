@@ -361,6 +361,7 @@ export default function Home() {
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyBusy, setBuyBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [serviceDown, setServiceDown] = useState(false);
 
   // Auto-dismiss toast after 4 seconds
   useEffect(() => {
@@ -368,6 +369,20 @@ export default function Home() {
     const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Surface a backend outage instead of silently rendering empty data.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/health")
+      .then((response) => response.ok)
+      .catch(() => false)
+      .then((healthy) => {
+        if (!cancelled) setServiceDown(!healthy);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredSkills = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -754,6 +769,11 @@ export default function Home() {
         <div className="toast-bar" role="status" aria-live="polite">
           <span>{toast}</span>
           <button type="button" onClick={() => setToast(null)} aria-label="关闭">×</button>
+        </div>
+      )}
+      {serviceDown && (
+        <div className="service-banner" role="alert">
+          账号与数据服务暂时不可用，正在恢复中。浏览技能不受影响，请稍后再试登录、注册或购买。
         </div>
       )}
       <header className="app-header">

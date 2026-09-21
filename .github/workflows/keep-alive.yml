@@ -1,51 +1,136 @@
 name: Keep Supabase Alive
 
-# Ping Supabase every day to prevent free-tier auto-pause (pauses after 7 days
-# of inactivity). Uses the PUBLIC anon key to make a real database request,
-# which reliably counts as project activity. Fails loudly if Supabase is down
-# so GitHub sends a workflow failure notification.
+# Supabase pauses free-tier projects after 7 days WITHOUT project activity, and
+# activity only counts when a request actually reaches the backend (Postgres or
+# GoTrue).
+#
+# Why this file was rewritten (2026-09-21):
+#   The project silently paused on 2026-09-11 — exactly 7 days after the last real
+#   activity (2026-09-04). The previous probe authenticated with a LEGACY anon JWT
+#   while the project had migrated to the new `sb_publishable_...` key format, so
+#   every request was rejected at the API gateway with 401 and never reached
+#   Postgres. The old probe accepted that 401 as success, so it reported "passed"
+#   for a week while generating zero activity.
+#
+# This version: (1) uses the current publishable key, (2) asserts the probe really
+# reached the backend, (3) runs twice daily, (4) opens a GitHub issue on failure so
+# an outage cannot go unnoticed for days.
 
 on:
   schedule:
-    # Runs at 08:00 UTC every day
+    # 08:00 and 20:00 UTC — well inside the 7-day window even if a run is delayed
     - cron: "0 8 * * *"
+    - cron: "0 20 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  SITE_URL: https://xingmingju-next.vercel.app
+  SUPABASE_HOST: ycefjltmcjkwavlihcsu.supabase.co
+  # Public publishable key (safe to commit — it ships in the browser bundle).
+  # Rotate it without editing this file by creating a repo variable named
+  # SUPABASE_PUBLISHABLE_KEY in Settings -> Secrets and variables -> Actions.
+  SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_DmjvOWlMYZ_1xDRm0WtA0w_N81hE6Ue' }}
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping website and Supabase
+      - name: Probe website and Supabase
         run: |
-          set -e
+          set -uo pipefail
+
+          CURL="curl -sS --retry 2 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25"
+          FAIL=0
+          SUMMARY=""
+          report() { SUMMARY="${SUMMARY}- $1"$'\n'; echo "$1"; }
+          pass() { report "OK   $1"; }
+          fail() { report "FAIL $1"; FAIL=1; }
+
           echo "=== $(date -u) ==="
-          CURL_FLAGS="--retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 20"
 
           # 1. Frontend must be up
-          HOME_CODE=$(curl -s -o /dev/null -w "%{http_code}" $CURL_FLAGS https://xingmingju-next.vercel.app/)
-          echo "Homepage: HTTP $HOME_CODE"
+          HOME_CODE=$($CURL -o /dev/null -w "%{http_code}" "$SITE_URL/" || echo "000")
+          if [ "$HOME_CODE" = "200" ]; then pass "首页 HTTP $HOME_CODE"; else fail "首页 HTTP $HOME_CODE"; fi
 
-          # 2. Auth service must be up
-          AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" $CURL_FLAGS https://ycefjltmcjkwavlihcsu.supabase.co/auth/v1/settings)
-          echo "Auth: HTTP $AUTH_CODE"
-          # 401 means the auth service responded (it requires an apikey header)
-          if [ "$AUTH_CODE" != "401" ] && [ "$AUTH_CODE" != "200" ]; then
-            echo "ERROR: Supabase auth service unreachable (HTTP $AUTH_CODE)"
+          # 2. DNS — a paused project loses its DNS record entirely
+          if getent hosts "$SUPABASE_HOST" >/dev/null 2>&1; then
+            pass "Supabase DNS 可解析"
+          else
+            fail "Supabase 域名无法解析：项目很可能已被暂停，请到 Supabase 控制台点 Restore project"
+          fi
+
+          # 3. Auth service (GoTrue) — counts as auth activity
+          AUTH_CODE=$($CURL -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            "https://$SUPABASE_HOST/auth/v1/settings" || echo "000")
+          if [ "$AUTH_CODE" = "200" ]; then pass "Auth 服务 HTTP $AUTH_CODE"; else fail "Auth 服务 HTTP $AUTH_CODE"; fi
+
+          # 4. PostgREST — the only probe that guarantees Postgres activity
+          REST_CODE=$($CURL -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "https://$SUPABASE_HOST/rest/v1/question_stats?select=date&limit=1" || echo "000")
+          case "$REST_CODE" in
+            200|206) pass "PostgREST HTTP $REST_CODE（查询已到达 Postgres，计入项目活动）" ;;
+            403)     pass "PostgREST HTTP $REST_CODE（数据库已响应，计入项目活动）" ;;
+            401)     fail "PostgREST HTTP 401：密钥被网关拒绝，请求未到达数据库，不计入活动" ;;
+            *)       fail "PostgREST HTTP $REST_CODE：无法确认请求到达数据库" ;;
+          esac
+
+          {
+            echo "### Supabase 保活检查"
+            echo ""
+            echo "$SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "保活检查失败。若域名无法解析，请在 Supabase 控制台执行 Restore project。"
             exit 1
           fi
 
-          # 3. Real Postgres query via PostgREST using the PUBLIC anon key.
-          #    A 401 is expected (no SELECT grant for anon) but proves Postgres
-          #    is serving queries — which is what counts as activity.
-          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZWZqbHRtY2prd2F2bGloY3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NTAzODYsImV4cCI6MjA5NTAyNjM4Nn0.wP1_aecc6oNctjraPAprenr47SrglLWeemX3yXS-fd4"
-          REST_CODE=$(curl -s -o /dev/null -w "%{http_code}" $CURL_FLAGS \
-            -H "apikey: $ANON_KEY" \
-            "https://ycefjltmcjkwavlihcsu.supabase.co/rest/v1/question_stats?limit=1")
-          echo "PostgREST: HTTP $REST_CODE"
-          if [ "$REST_CODE" = "000" ] || [ "$REST_CODE" = "521" ] || [ "$REST_CODE" = "502" ] || [ "$REST_CODE" = "503" ]; then
-            echo "ERROR: Supabase database is down (HTTP $REST_CODE)"
-            exit 1
+          echo "全部检查通过。"
+
+      - name: Open an issue when the project is unreachable
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          TITLE="Supabase 保活失败"
+          {
+            echo "保活检查失败：Supabase 可能已被暂停（$(date -u)）。"
+            echo
+            echo "**处理步骤**"
+            echo "1. 打开 https://supabase.com/dashboard/project/ycefjltmcjkwavlihcsu"
+            echo "2. 若显示 Paused，点击 **Restore project**"
+            echo "3. 恢复后手动重跑本工作流确认通过"
+            echo
+            echo "免费版项目在 7 天无真实活动后会被自动暂停。"
+          } > /tmp/keep-alive-body.md
+
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "${NUM:-}" ]; then
+            gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body-file /tmp/keep-alive-body.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/keep-alive-body.md
           fi
 
-          echo "All checks passed."
+      - name: Close the issue once the project is healthy again
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          TITLE="Supabase 保活失败"
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "${NUM:-}" ]; then
+            gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" \
+              --comment "保活检查已恢复正常，Supabase 可访问。"
+          fi
 

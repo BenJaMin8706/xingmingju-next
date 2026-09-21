@@ -56,6 +56,7 @@ npm.cmd run start
 - `POST /api/chat/recommend`：根据用户问题推荐技能，并记录问题分类统计
 - `POST /api/reports`：生成报告并保存一条报告记录
 - `GET /api/reports`：登录后读取当前账号下的历史报告（需 `Authorization: Bearer <access_token>`）
+- `GET /api/health`：后端健康检查。数据库正常返回 `200`，不可用返回 `503`；首页据此显示服务提示条
 
 示例：
 
@@ -150,3 +151,22 @@ http://localhost:3000/?auth=verified
 ## 后续上线建议
 
 `.data/` 适合本地演示和小范围试用。Vercel 等 serverless 平台会使用 `/tmp` 临时目录以避免接口报错，但数据不会长期稳定保存。正式上线给更多用户使用时，应改成数据库存储，例如 Supabase、Postgres、MySQL 或 Redis，并增加用户、订单、支付、报告权限和后台管理。
+
+## Supabase 暂停与恢复
+
+Supabase 免费版项目在 **7 天没有真实活动** 后会被自动暂停。暂停后项目域名会从 DNS 中移除，表现为所有接口失败、登录注册不可用，但站点本身仍能打开（首页会显示“账号与数据服务暂时不可用”提示条）。
+
+**关键点**：只有真正到达后端（Postgres / GoTrue）的请求才算“活动”。被 API 网关以 `401` 拒绝的请求（例如使用已失效的旧版 anon JWT）**不产生任何活动**。
+
+这正是 2026-09-11 项目被暂停的原因：项目迁移到新版 `sb_publishable_...` 密钥后，保活脚本仍在使用旧版 JWT，请求在网关层就被拒绝，连续一周“显示成功”却没提供任何活动。因此不要只看保活工作流是否变绿，要确认日志中 PostgREST 返回的是 `200`/`206`。
+
+### 恢复步骤
+
+1. 打开 https://supabase.com/dashboard/project/ycefjltmcjkwavlihcsu
+2. 若显示 Paused，点击 **Restore project**。免费版暂停不会删除数据。
+3. 恢复后手动运行一次 `.github/workflows/keep-alive.yml`，确认全部检查通过。
+4. 若保活仍失败，检查仓库变量 `SUPABASE_PUBLISHABLE_KEY` 是否与 Supabase 控制台当前的 publishable key 一致。
+
+### 保活机制
+
+`.github/workflows/keep-alive.yml` 每天 08:00 / 20:00 UTC 运行，依次探测首页、DNS、Auth 服务和 PostgREST 查询，并断言请求确实到达数据库。失败时自动创建 GitHub Issue，恢复正常后自动关闭。密钥轮换后只需更新仓库变量，无需改代码。
