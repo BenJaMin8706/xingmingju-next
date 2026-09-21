@@ -162,8 +162,8 @@ Supabase 免费版项目在 **7 天没有真实活动** 后会被自动暂停。
 
 ### 恢复步骤
 
-1. 打开 https://supabase.com/dashboard/project/ycefjltmcjkwavlihcsu
-2. 若显示 Paused，点击 **Restore project**。免费版暂停不会删除数据。
+1. 打开 https://supabase.com/dashboard/organizations，选择组织，再选中被暂停的项目
+2. 点击 **Resume project** 并确认。免费版暂停不会删除数据，恢复窗口为 1 年。
 3. 恢复后手动运行一次 `.github/workflows/keep-alive.yml`，确认全部检查通过。
 4. 若保活仍失败，检查仓库变量 `SUPABASE_PUBLISHABLE_KEY` 是否与 Supabase 控制台当前的 publishable key 一致。
 

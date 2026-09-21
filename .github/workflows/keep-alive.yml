@@ -60,7 +60,7 @@ jobs:
           if getent hosts "$SUPABASE_HOST" >/dev/null 2>&1; then
             pass "Supabase DNS 可解析"
           else
-            fail "Supabase 域名无法解析：项目很可能已被暂停，请到 Supabase 控制台点 Restore project"
+            fail "Supabase 域名无法解析：项目很可能已被暂停，请到 Supabase 控制台点 Resume project"
           fi
 
           # 3. Auth service (GoTrue) — counts as auth activity
@@ -105,8 +105,8 @@ jobs:
             echo "保活检查失败：Supabase 可能已被暂停（$(date -u)）。"
             echo
             echo "**处理步骤**"
-            echo "1. 打开 https://supabase.com/dashboard/project/ycefjltmcjkwavlihcsu"
-            echo "2. 若显示 Paused，点击 **Restore project**"
+            echo "1. 打开 https://supabase.com/dashboard/organizations，选择组织与被暂停的项目"
+            echo "2. 点击 **Resume project** 并确认（按钮名是 Resume，不是 Restore）"
             echo "3. 恢复后手动重跑本工作流确认通过"
             echo
             echo "免费版项目在 7 天无真实活动后会被自动暂停。"
