@@ -124,3 +124,17 @@ grant execute on function public.increment_question_stat(date, text) to service_
 alter table public.question_stats enable row level security;
 alter table public.reports enable row level security;
 alter table public.credit_events enable row level security;
+
+-- Explicit privileges for the server role.
+--
+-- Supabase applies default privileges to objects created through the SQL editor,
+-- but NOT to objects created by other paths (for example the Management API used
+-- to deploy functions). When that happens every server-side query fails with
+-- 42501 "permission denied for table ..." and the hint names a GRANT that looks
+-- redundant. Granting explicitly makes the schema self-sufficient instead of
+-- depending on how it happened to be applied.
+grant usage on schema public to service_role;
+grant all privileges on table public.question_stats to service_role;
+grant all privileges on table public.reports to service_role;
+grant all privileges on table public.credit_events to service_role;
+grant all privileges on all sequences in schema public to service_role;
