@@ -14,7 +14,12 @@ name: Keep Supabase Alive
 #
 # This version: (1) uses the current publishable key, (2) asserts the probe really
 # reached the backend, (3) runs twice daily, (4) opens a GitHub issue on failure so
-# an outage cannot go unnoticed for days.
+# an outage cannot go unnoticed for days, and (5) RESTORES a paused project
+# automatically through the Management API.
+#
+# Auto-restore requires a repo secret named SUPABASE_ACCESS_TOKEN (a Supabase
+# personal access token that includes project_admin_write). Without it the job still
+# detects and reports the outage, it just cannot fix it on its own.
 
 on:
   schedule:
@@ -30,6 +35,7 @@ permissions:
 env:
   SITE_URL: https://xingmingju-next.vercel.app
   SUPABASE_HOST: ycefjltmcjkwavlihcsu.supabase.co
+  SUPABASE_REF: ycefjltmcjkwavlihcsu
   # Public publishable key (safe to commit — it ships in the browser bundle).
   # Rotate it without editing this file by creating a repo variable named
   # SUPABASE_PUBLISHABLE_KEY in Settings -> Secrets and variables -> Actions.
@@ -40,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Probe website and Supabase
+        id: probe
         run: |
           set -uo pipefail
 
@@ -56,11 +63,14 @@ jobs:
           HOME_CODE=$($CURL -o /dev/null -w "%{http_code}" "$SITE_URL/" || echo "000")
           if [ "$HOME_CODE" = "200" ]; then pass "首页 HTTP $HOME_CODE"; else fail "首页 HTTP $HOME_CODE"; fi
 
-          # 2. DNS — a paused project loses its DNS record entirely
+          # 2. DNS — a paused project loses its DNS record entirely, and that is the
+          #    signature this workflow uses to trigger an automatic restore.
           if getent hosts "$SUPABASE_HOST" >/dev/null 2>&1; then
             pass "Supabase DNS 可解析"
+            PAUSED_SIGNATURE=false
           else
-            fail "Supabase 域名无法解析：项目很可能已被暂停，请到 Supabase 控制台点 Resume project"
+            fail "Supabase 域名无法解析：项目很可能已被暂停（稍后会自动尝试恢复）"
+            PAUSED_SIGNATURE=true
           fi
 
           # 3. Auth service (GoTrue) — counts as auth activity
@@ -98,48 +108,120 @@ jobs:
             echo "$SUMMARY"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # Publish the outcome instead of failing here, so the job can attempt an
+          # automatic restore first and only then decide whether to raise an alarm.
+          if [ "$FAIL" -ne 0 ]; then echo "failed=true" >> "$GITHUB_OUTPUT"; else echo "failed=false" >> "$GITHUB_OUTPUT"; fi
+          echo "paused=$PAUSED_SIGNATURE" >> "$GITHUB_OUTPUT"
+
           if [ "$FAIL" -ne 0 ]; then
-            echo "保活检查失败。若域名无法解析，请在 Supabase 控制台执行 Restore project。"
+            echo "保活检查失败（后续步骤将尝试自动恢复）。"
+          else
+            echo "全部检查通过。"
+          fi
+
+      - name: Attempt automatic restore
+        id: restore
+        if: steps.probe.outputs.paused == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::warning::SUPABASE_ACCESS_TOKEN 未配置，无法自动恢复。"
+            echo "attempted=false" >> "$GITHUB_OUTPUT"
+            echo "accepted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "向 Management API 请求恢复 $SUPABASE_REF ..."
+          CODE=$(curl -sS -o /tmp/restore.json -w "%{http_code}" -X POST -m 60 \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_REF/restore" || echo "000")
+          echo "restore HTTP $CODE"
+          head -c 300 /tmp/restore.json 2>/dev/null || true
+          echo
+
+          echo "attempted=true" >> "$GITHUB_OUTPUT"
+          case "$CODE" in
+            200|201|202) echo "accepted=true" >> "$GITHUB_OUTPUT" ;;
+            *)           echo "accepted=false" >> "$GITHUB_OUTPUT"; echo "::warning::自动恢复调用返回 HTTP $CODE" ;;
+          esac
+
+      - name: Wait for the project to come back
+        id: wait
+        if: steps.restore.outputs.accepted == 'true'
+        run: |
+          set -uo pipefail
+          for i in $(seq 1 30); do
+            AUTH=$(curl -sS -o /dev/null -w "%{http_code}" -m 15 \
+              -H "apikey: $SUPABASE_KEY" \
+              "https://$SUPABASE_HOST/auth/v1/settings" || echo "000")
+            REST_OUT=$(curl -sS -w $'\n%{http_code}' -m 15 \
+              -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY" \
+              "https://$SUPABASE_HOST/rest/v1/question_stats?select=date&limit=1" || printf '\n000')
+            REST_CODE=$(printf '%s' "$REST_OUT" | tail -n1)
+            REST_BODY=$(printf '%s' "$REST_OUT" | sed '$d')
+
+            DB_OK=no
+            if [ "$REST_CODE" = "200" ] || [ "$REST_CODE" = "206" ]; then DB_OK=yes; fi
+            if printf '%s' "$REST_BODY" | grep -q '"code"'; then DB_OK=yes; fi
+
+            echo "尝试 $i：auth=$AUTH postgrest=$REST_CODE 到达数据库=$DB_OK"
+            if [ "$AUTH" = "200" ] && [ "$DB_OK" = "yes" ]; then
+              echo "recovered=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "recovered=false" >> "$GITHUB_OUTPUT"
+
+      - name: Report the outcome
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          TITLE="Supabase 保活失败"
+          FAILED="${{ steps.probe.outputs.failed }}"
+          PAUSED="${{ steps.probe.outputs.paused }}"
+          ATTEMPTED="${{ steps.restore.outputs.attempted }}"
+          RECOVERED="${{ steps.wait.outputs.recovered }}"
+
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number' 2>/dev/null || true)
+
+          if [ "$RECOVERED" = "true" ]; then
+            echo "项目已由本工作流自动恢复。"
+            if [ -n "${NUM:-}" ]; then
+              gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" \
+                --comment "项目已被保活工作流自动恢复，Supabase 可访问。"
+            fi
+            exit 0
+          fi
+
+          if [ "$FAILED" = "true" ]; then
+            {
+              echo "保活检查失败：Supabase 不可用（$(date -u)）。"
+              echo
+              echo "- 检测到暂停特征（DNS 无法解析）：**$PAUSED**"
+              echo "- 已调用自动恢复接口：**$ATTEMPTED**"
+              echo
+              echo "**处理步骤**"
+              echo "1. 打开 https://supabase.com/dashboard/organizations，选择组织与被暂停的项目"
+              echo "2. 点击 **Resume project** 并确认（按钮名是 Resume，不是 Restore）"
+              echo "3. 恢复后手动重跑本工作流确认通过"
+              echo
+              echo "自动恢复依赖仓库密钥 SUPABASE_ACCESS_TOKEN（需含 project_admin_write 权限）。"
+            } > /tmp/keep-alive-body.md
+
+            if [ -n "${NUM:-}" ]; then
+              gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body-file /tmp/keep-alive-body.md
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/keep-alive-body.md
+            fi
             exit 1
           fi
 
-          echo "全部检查通过。"
-
-      - name: Open an issue when the project is unreachable
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          TITLE="Supabase 保活失败"
-          {
-            echo "保活检查失败：Supabase 可能已被暂停（$(date -u)）。"
-            echo
-            echo "**处理步骤**"
-            echo "1. 打开 https://supabase.com/dashboard/organizations，选择组织与被暂停的项目"
-            echo "2. 点击 **Resume project** 并确认（按钮名是 Resume，不是 Restore）"
-            echo "3. 恢复后手动重跑本工作流确认通过"
-            echo
-            echo "免费版项目在 7 天无真实活动后会被自动暂停。"
-          } > /tmp/keep-alive-body.md
-
-          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "\"$TITLE\" in:title" --json number --jq '.[0].number' 2>/dev/null || true)
-          if [ -n "${NUM:-}" ]; then
-            gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body-file /tmp/keep-alive-body.md
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file /tmp/keep-alive-body.md
-          fi
-
-      - name: Close the issue once the project is healthy again
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          TITLE="Supabase 保活失败"
-          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "\"$TITLE\" in:title" --json number --jq '.[0].number' 2>/dev/null || true)
+          echo "保活检查通过。"
           if [ -n "${NUM:-}" ]; then
             gh issue close "$NUM" --repo "$GITHUB_REPOSITORY" \
               --comment "保活检查已恢复正常，Supabase 可访问。"
