@@ -46,7 +46,10 @@ export async function callAI(messages: AIMessage[], options?: { temperature?: nu
   });
   if (!res.ok) {
     const errorText = await res.text().catch(() => "");
-    throw new Error(`AI API error: ${res.status} ${errorText}`.trim());
+    // Log the upstream body instead of embedding it in the thrown message, so
+    // the text cannot travel up into a user-facing response.
+    console.error("[ai] upstream error:", res.status, errorText.slice(0, 500));
+    throw new Error(`AI API error: HTTP ${res.status}`);
   }
 
   const data = (await res.json()) as {

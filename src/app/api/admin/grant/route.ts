@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     // Look up user by email
     const { data: users, error: listError } = await supabase.auth.admin.listUsers();
     if (listError) {
-      return NextResponse.json({ error: "查询用户失败: " + listError.message }, { status: 500 });
+      // Log the upstream detail server-side; never return it, so this endpoint
+      // cannot be used to read database or auth-configuration internals.
+      console.error("[admin/grant] listUsers failed:", listError.message);
+      return NextResponse.json({ error: "查询用户失败" }, { status: 500 });
     }
 
     const targetUser = users.users.find(

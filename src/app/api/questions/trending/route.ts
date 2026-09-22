@@ -5,7 +5,7 @@ import { readQuestionStats } from "@/lib/server-store";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const question = request.nextUrl.searchParams.get("question") || "";
+  const question = (request.nextUrl.searchParams.get("question") || "").slice(0, 500);
   const stats = await readQuestionStats();
 
   return NextResponse.json({

@@ -3,8 +3,8 @@ import { categories, categoryLabelMap, skills } from "@/lib/fortune-data";
 
 export function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const activeCategory = searchParams.get("category") || "all";
-  const query = (searchParams.get("q") || "").trim().toLowerCase();
+  const activeCategory = (searchParams.get("category") || "all").slice(0, 32);
+  const query = (searchParams.get("q") || "").trim().toLowerCase().slice(0, 100);
 
   const filteredSkills = skills.filter((skill) => {
     const categoryMatch = activeCategory === "all" || skill.category.includes(activeCategory);

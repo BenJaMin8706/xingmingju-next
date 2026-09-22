@@ -4,7 +4,7 @@ export default function ErrorPage({
   error,
   reset,
 }: {
-  error: Error;
+  error: Error & { digest?: string };
   reset: () => void;
 }) {
   return (
@@ -22,8 +22,13 @@ export default function ErrorPage({
     >
       <h1 style={{ fontSize: 48, margin: 0 }}>出错了</h1>
       <p style={{ color: "#666", maxWidth: 400 }}>
-        {error.message || "页面加载时发生了意外错误。"}
+        页面加载时发生了意外错误，请重试。如果反复出现，请把下面的错误编号发给站长。
       </p>
+      {error.digest && (
+        <p style={{ color: "#999", fontSize: 12, margin: "4px 0 0" }}>
+          错误编号：{error.digest}
+        </p>
+      )}
       <button
         onClick={reset}
         style={{

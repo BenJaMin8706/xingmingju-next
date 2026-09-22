@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const body = await request.json() as {
+    const body = await request.json().catch(() => ({})) as {
       email?: string;
       password?: string;
       username?: string;
@@ -27,9 +27,16 @@ export async function POST(request: NextRequest) {
       captchaToken?: string;
     };
 
-    const email = body.email?.trim() || "";
+    const email = body.email?.trim().toLowerCase().slice(0, 254) || "";
     const password = body.password || "";
     const captchaToken = body.captchaToken || "";
+
+    // Bound the profile fields: they are persisted verbatim into auth user
+    // metadata, so an oversized value would be stored as-is.
+    const username = body.username?.trim().slice(0, 40) || "";
+    const birthDate = (body.birthDate || "").trim().slice(0, 10);
+    const birthTime = (body.birthTime || "").trim().slice(0, 5);
+    const birthPlace = body.birthPlace?.trim().slice(0, 80) || "";
 
     if (!email || !password) {
       return NextResponse.json({ error: "邮箱和密码不能为空" }, { status: 400 });
@@ -50,18 +57,25 @@ export async function POST(request: NextRequest) {
         captchaToken,
         emailRedirectTo: `${request.nextUrl.origin}/?auth=verified`,
         data: {
-          username: body.username?.trim() || "",
-          birthDate: body.birthDate || "",
-          birthTime: body.birthTime || "",
-          birthPlace: body.birthPlace?.trim() || "",
+          username,
+          birthDate,
+          birthTime,
+          birthPlace,
         },
       },
     });
 
     if (error) {
-      return NextResponse.json({
-        error: error.message === "User already registered" ? "该邮箱已注册，请直接登录" : error.message,
-      }, { status: 400 });
+      if (error.message === "User already registered") {
+        return NextResponse.json({ error: "该邮箱已注册，请直接登录" }, { status: 400 });
+      }
+      if (/captcha/i.test(error.message)) {
+        return NextResponse.json({ error: "人机验证未通过，请重试" }, { status: 400 });
+      }
+      // Never forward upstream auth errors verbatim: they can expose rate
+      // limits, SMTP configuration, or other service internals.
+      console.error("[register] signUp failed:", error.message);
+      return NextResponse.json({ error: "注册失败，请稍后重试或更换邮箱" }, { status: 400 });
     }
 
     return NextResponse.json({
